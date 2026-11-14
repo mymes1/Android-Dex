@@ -106,7 +106,7 @@ class PrivilegedTaskService : IDesktopTaskBridge.Stub {
         requireShell()
         validateComponent(component)
         if (displayId < 0) throw RemoteException("Invalid display")
-        val output = command(listOf("am", "start", "--windowingMode", "5", "--displayId", displayId.toString(), "-n", component))
+        val output = command(listOf("am", "start", "-W", "--windowingMode", "5", "--displayId", displayId.toString(), "-n", component))
         if (output.contains("Error:", true) || output.contains("Exception", true) || output.contains("does not exist", true))
             throw RemoteException(output.take(400))
         return "Android accepted the launch. The firmware may still choose fullscreen."

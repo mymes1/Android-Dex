@@ -101,7 +101,7 @@ fi
 
 step 'Running desktop/Accessibility instrumentation'
 set +e
-adb shell am instrument -w -r -e notClass com.shrey.androiddex.standalone.ShizukuDeviceWorkflowTest "$DEBUG_PACKAGE.test/androidx.test.runner.AndroidJUnitRunner" | tee "$REPORT_DIR/instrumentation.txt"
+adb shell am instrument -w -r -e class com.shrey.androiddex.standalone.DesktopFlowTest "$DEBUG_PACKAGE.test/androidx.test.runner.AndroidJUnitRunner" | tee "$REPORT_DIR/instrumentation.txt"
 INSTRUMENT_STATUS=${PIPESTATUS[0]}
 set -e
 adb exec-out screencap -p > "$REPORT_DIR/after-tests.png"

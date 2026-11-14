@@ -57,6 +57,7 @@ class NativeDesktopWorkflowTest {
         enterDesktop()
         await(20000) { ShizukuManager.state.value.authorized && ShizukuManager.state.value.bridgeReady }
         assertTrue("Shizuku task bridge must be connected", ShizukuManager.state.value.bridgeReady)
+        await(10000) { runCatching { runBlocking { ShizukuManager.probe(false, false, 0).taskApi } }.getOrDefault(false) }
 
         compose.onNodeWithText("Settings", substring = false).performClick()
         compose.onNodeWithText("Enable native app windows").performScrollTo().performClick()
