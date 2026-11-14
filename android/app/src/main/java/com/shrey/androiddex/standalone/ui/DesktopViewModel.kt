@@ -321,8 +321,9 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     }
     fun toggleNativeMaximize(taskId: Int) {
         viewModelScope.launch {
+            val maximize = taskId !in _maximizedNativeTasks.value
             runCatching {
-                if (taskId in _maximizedNativeTasks.value) {
+                if (!maximize) {
                     ShizukuManager.setTaskWindowingMode(taskId, 5)
                     val bounds = restoreBounds[taskId] ?: _nativeBounds.value[taskId]
                     if (bounds != null) ShizukuManager.resizeTask(taskId, bounds)
@@ -332,7 +333,9 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                     ShizukuManager.setTaskWindowingMode(taskId, 1)
                 }
             }.onSuccess {
-                _maximizedNativeTasks.value = if (taskId in _maximizedNativeTasks.value) _maximizedNativeTasks.value - taskId else _maximizedNativeTasks.value + taskId
+                _maximizedNativeTasks.value = if (maximize) _maximizedNativeTasks.value + taskId else _maximizedNativeTasks.value - taskId
+                // Update the caption immediately; the next shell poll confirms the real mode/bounds.
+                _tasks.value = _tasks.value.map { if (it.id == taskId) it.copy(windowingMode = if (maximize) 1 else 5) else it }
                 refreshTasks()
             }.onFailure { notify(it.message ?: "Android refused the window mode change") }
         }
