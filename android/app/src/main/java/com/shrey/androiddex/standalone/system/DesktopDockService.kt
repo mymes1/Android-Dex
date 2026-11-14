@@ -27,12 +27,12 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
-import androidx.lifecycle.ViewTreeLifecycleOwner
-import androidx.lifecycle.ViewTreeViewModelStoreOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
-import androidx.savedstate.ViewTreeSavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.shrey.androiddex.standalone.R
 import com.shrey.androiddex.standalone.data.PreferencesRepository
 import com.shrey.androiddex.standalone.ui.DesktopViewModel
@@ -187,9 +187,9 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
     private fun compose(content: @Composable () -> Unit): ComposeView {
         val context = displayContext ?: this
         return ComposeView(context).apply {
-            ViewTreeLifecycleOwner.set(this, this@DesktopDockService)
-            ViewTreeViewModelStoreOwner.set(this, this@DesktopDockService)
-            ViewTreeSavedStateRegistryOwner.set(this, this@DesktopDockService)
+            setViewTreeLifecycleOwner(this@DesktopDockService)
+            setViewTreeViewModelStoreOwner(this@DesktopDockService)
+            setViewTreeSavedStateRegistryOwner(this@DesktopDockService)
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent { DexTheme { content() } }
         }
