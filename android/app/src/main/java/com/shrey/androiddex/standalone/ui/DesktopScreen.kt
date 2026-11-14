@@ -261,7 +261,9 @@ private fun DesktopSearchBar(placeholder: String, perplexity: Boolean) {
 
 @Composable
 private fun AnalogClock(time: Long, modifier: Modifier = Modifier) {
-    val calendar = remember(time) { java.util.Calendar.getInstance().apply { timeInMillis = time } }
+    var now by remember { mutableLongStateOf(time) }
+    LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(1000) } }
+    val calendar = remember(now) { java.util.Calendar.getInstance().apply { timeInMillis = now } }
     Canvas(modifier) {
         val radius = size.minDimension / 2f
         val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)

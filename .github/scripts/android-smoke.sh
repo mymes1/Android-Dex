@@ -78,7 +78,19 @@ adb shell settings put secure enabled_accessibility_services "$SERVICE"
 adb shell settings put secure accessibility_enabled 1
 adb shell am start -W -n "$DEBUG_PACKAGE/com.shrey.androiddex.standalone.MainActivity" > "$REPORT_DIR/debug-startup.txt"
 sleep 3
-adb shell settings get secure enabled_accessibility_services | tee "$REPORT_DIR/accessibility-setting.txt"
+adb shell settings put secure enabled_accessibility_services "$SERVICE" > "$REPORT_DIR/accessibility-put.txt" 2>&1 || true
+adb shell settings put secure accessibility_enabled 1 >> "$REPORT_DIR/accessibility-put.txt" 2>&1 || true
+ACCESSIBILITY_VALUE=''
+for _ in $(seq 1 20); do
+  ACCESSIBILITY_VALUE="$(adb shell settings get secure enabled_accessibility_services | tr -d '\r' || true)"
+  [[ "$ACCESSIBILITY_VALUE" == *"$SERVICE"* ]] && break
+  sleep 0.5
+done
+printf '%s\n' "$ACCESSIBILITY_VALUE" > "$REPORT_DIR/accessibility-setting.txt"
+if [[ "$ACCESSIBILITY_VALUE" != *"$SERVICE"* ]]; then
+  adb shell settings list secure > "$REPORT_DIR/secure-settings.txt" 2>/dev/null || true
+  adb shell dumpsys accessibility > "$REPORT_DIR/accessibility-dump.txt" 2>/dev/null || true
+fi
 grep -q "$SERVICE" "$REPORT_DIR/accessibility-setting.txt"
 adb shell dumpsys accessibility > "$REPORT_DIR/accessibility-before-tests.txt"
 adb logcat -d -s AndroidRuntime:E > "$REPORT_DIR/accessibility-crash.txt" || true

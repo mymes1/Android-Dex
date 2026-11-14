@@ -57,6 +57,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     private val _maximizedNativeTasks = MutableStateFlow<Set<Int>>(emptySet())
     val maximizedNativeTasks = _maximizedNativeTasks.asStateFlow()
     private val restoreBounds = mutableMapOf<Int, PixelBounds>()
+    private val nativeResizeRequests = Channel<Pair<Int, PixelBounds>>(Channel.CONFLATED)
     private var resizeJob: Job? = null
     private val _taskError = MutableStateFlow("Connect and authorize Shizuku to list real Android tasks.")
     val taskError = _taskError.asStateFlow()
@@ -72,6 +73,12 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
 
     init {
         application.getSharedPreferences("dex_preferences", Context.MODE_PRIVATE).registerOnSharedPreferenceChangeListener(preferenceListener)
+        viewModelScope.launch {
+            for ((taskId, bounds) in nativeResizeRequests) {
+                runCatching { ShizukuManager.resizeTask(taskId, bounds) }
+                delay(30)
+            }
+        }
         refreshApps()
     }
 
@@ -332,11 +339,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     }
     fun dragNativeTask(taskId: Int, bounds: PixelBounds) {
         previewNativeBounds(taskId, bounds)
-        resizeJob?.cancel()
-        resizeJob = viewModelScope.launch {
-            delay(45)
-            runCatching { ShizukuManager.resizeTask(taskId, bounds) }.onFailure { notify(it.message ?: "Android refused the window resize") }
-        }
+        nativeResizeRequests.trySend(taskId to bounds)
     }
     fun commitNativeBounds(taskId: Int, bounds: PixelBounds) {
         resizeJob?.cancel()
@@ -367,6 +370,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     override fun onCleared() {
         application.getSharedPreferences("dex_preferences", Context.MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(preferenceListener)
         resizeJob?.cancel()
+        nativeResizeRequests.close()
         persist()
         super.onCleared()
     }
