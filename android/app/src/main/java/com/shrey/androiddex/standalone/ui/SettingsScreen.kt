@@ -164,7 +164,7 @@ fun DeviceSettings(vm: DesktopViewModel, status: SystemStatus) {
         InfoRow("Device", "${Build.MANUFACTURER} ${Build.MODEL}")
         InfoRow("Android", "${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
         InfoRow("Current display", "${displays.firstOrNull { it.id == vm.displayId }?.let { "${it.width} × ${it.height} px · ${it.density} dpi · ${it.refresh} Hz" } ?: "Unavailable"}")
-        InfoRow("App memory class", "${context.getSystemService(ActivityManager::class.java).memoryClass} MB${if (ActivityManager.isLowRamDevice(context)) " · low-RAM device" else ""}")
+        InfoRow("App memory class", "${context.getSystemService(ActivityManager::class.java).memoryClass} MB${if (context.getSystemService(ActivityManager::class.java).isLowRamDevice) " · low-RAM device" else ""}")
         InfoRow("Freeform feature", if (caps.freeformFeature) "Reported by Android" else "Not reported by Android")
         InfoRow("Freeform override", caps.freeformSetting)
         InfoRow("Force-resizable override", caps.forceResizableSetting)

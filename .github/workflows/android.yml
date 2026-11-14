@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
 
 concurrency:
   group: android-${{ github.ref }}
@@ -17,22 +18,24 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/wrapper-validation@v4
       - uses: gradle/actions/setup-gradle@v4
-      - uses: android-actions/setup-android@v3
-      - name: Install API 35 SDK
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - name: Compile debug, JVM tests and lint
         working-directory: android
-        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/android-build.log"
       - name: Create disposable release-test key
         run: |
           PASSWORD="$(openssl rand -hex 24)"
@@ -54,10 +57,12 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Build optimized release APK with disposable test signature
         working-directory: android
-        run: ./gradlew :app:assembleRelease --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleRelease --stacktrace 2>&1 | tee -a "$RUNNER_TEMP/android-build.log"
       - name: Verify and label APK
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose android/app/build/outputs/apk/release/app-release.apk
+          "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools/35.0.0/apksigner" verify --verbose android/app/build/outputs/apk/release/app-release.apk
           mkdir -p "$RUNNER_TEMP/apks"
           cp android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/apks/Shreys-Android-DeX-1.0.0-TEST-RELEASE.apk"
           cp android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/apks/app-debug.apk"
@@ -83,19 +88,31 @@ jobs:
           path: |
             android/app/build/reports/
             android/app/build/test-results/
+          if-no-files-found: ignore
           retention-days: 7
+      - name: Publish compiler diagnostics for API-only environments
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = process.env.RUNNER_TEMP + '/android-build.log';
+            const log = fs.existsSync(path) ? fs.readFileSync(path, 'utf8').slice(-50000) : 'Build failed before the compile step.';
+            await github.rest.checks.create({owner: context.repo.owner, repo: context.repo.repo,
+              name: 'Android compiler diagnostics', head_sha: context.sha, status: 'completed', conclusion: 'failure',
+              output: {title: 'Android build diagnostics', summary: '```text\n' + log + '\n```'}});
 
   emulator:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - uses: actions/download-artifact@v4
         with:
           name: android-test-inputs
@@ -124,4 +141,20 @@ jobs:
         with:
           name: android-emulator-evidence
           path: ${{ runner.temp }}/android-emulator-reports/
+          if-no-files-found: ignore
           retention-days: 7
+      - name: Publish emulator diagnostics for API-only environments
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const dir = process.env.RUNNER_TEMP + '/android-emulator-reports';
+            let summary = 'Emulator failed before producing reports.';
+            for (const name of ['release-startup.txt', 'instrumentation.txt', 'summary.txt']) {
+              const path = dir + '/' + name;
+              if (fs.existsSync(path)) summary += '\n\n### ' + name + '\n```text\n' + fs.readFileSync(path, 'utf8').slice(-20000) + '\n```';
+            }
+            await github.rest.checks.create({owner: context.repo.owner, repo: context.repo.repo,
+              name: 'Android emulator diagnostics', head_sha: context.sha, status: 'completed', conclusion: 'failure',
+              output: {title: 'Android emulator diagnostics', summary}});
