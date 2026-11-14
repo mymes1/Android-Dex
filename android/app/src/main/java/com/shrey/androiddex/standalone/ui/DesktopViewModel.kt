@@ -365,6 +365,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
         nativeResizeRequests.trySend(NativeResizeRequest(taskId, bounds))
     }
     fun commitNativeBounds(taskId: Int, bounds: PixelBounds) {
+        Log.e("DesktopDockService", "Native bounds commit task=$taskId bounds=$bounds")
         previewNativeBounds(taskId, bounds)
         nativeResizeRequests.trySend(NativeResizeRequest(taskId, bounds, commit = true))
     }

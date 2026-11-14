@@ -147,7 +147,8 @@ class NativeDesktopWorkflowTest {
         await(8000) { runBlocking { ShizukuManager.tasks(0) }.any { it.id == task.id && it.windowingMode == 5 } }
 
         val before = runBlocking { ShizukuManager.taskBounds(task.id) }!!
-        device.swipe(before.left + before.width / 3, before.top + 12, before.left + before.width / 3 + 90, before.top + 70, 24)
+        // Keep the gesture inside the 38dp caption window while still moving the real task.
+        device.swipe(before.left + before.width / 3, before.top + 20, before.left + before.width / 3 + 140, before.top + 20, 24)
         await(6000) { runCatching { runBlocking { ShizukuManager.taskBounds(task.id) } }.getOrNull()?.let { it.left != before.left || it.top != before.top } == true }
         val moved = runBlocking { ShizukuManager.taskBounds(task.id) }
         assertNotNull(moved)
