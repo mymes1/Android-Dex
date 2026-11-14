@@ -41,8 +41,13 @@ object WindowGeometry {
         return Bounds(x.coerceIn(0f, (aw - w).coerceAtLeast(0f)), y.coerceIn(0f, (ah - h).coerceAtLeast(0f)), w, h)
     }
 
-    fun resize(window: DesktopWindow, dx: Float, dy: Float, areaWidth: Float, areaHeight: Float): Bounds =
-        clamp(window.x, window.y, window.width + dx, window.height + dy, areaWidth, minOf(areaHeight - window.y, areaHeight).coerceAtLeast(1f))
+    fun resize(window: DesktopWindow, dx: Float, dy: Float, areaWidth: Float, areaHeight: Float): Bounds {
+        val availableWidth = areaWidth.coerceAtLeast(1f)
+        val availableHeight = (areaHeight - window.y.coerceAtLeast(0f)).coerceAtLeast(1f)
+        val width = (window.width + dx).coerceIn(minOf(MIN_WIDTH, availableWidth), availableWidth)
+        val height = (window.height + dy).coerceIn(minOf(MIN_HEIGHT, availableHeight), availableHeight)
+        return clamp(window.x, window.y, width, height, areaWidth, areaHeight)
+    }
 }
 
 data class AppEntry(val packageName: String, val component: String, val label: String)

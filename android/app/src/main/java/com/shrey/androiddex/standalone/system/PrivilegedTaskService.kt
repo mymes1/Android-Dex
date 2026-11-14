@@ -41,7 +41,7 @@ class PrivilegedTaskService : IDesktopTaskBridge.Stub {
             val method = manager.javaClass.methods.firstOrNull { it.name == "getTasks" && it.parameterCount == 4 }
                 ?: manager.javaClass.methods.firstOrNull { it.name == "getTasks" && it.parameterCount == 3 }
                 ?: throw NoSuchMethodException("No compatible getTasks method")
-            val arguments = if (method.parameterCount == 4) arrayOf(limit, false, false, displayId) else arrayOf(limit, false, false)
+            val arguments: Array<Any> = if (method.parameterCount == 4) arrayOf(limit, false, false, displayId) else arrayOf(limit, false, false)
             val result = method.invoke(manager, *arguments) as? List<*> ?: emptyList<Any>()
             result.take(limit).mapNotNull { value ->
                 val task = value ?: return@mapNotNull null

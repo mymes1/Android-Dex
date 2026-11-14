@@ -35,7 +35,7 @@ jobs:
         working-directory: android
         run: |
           set -o pipefail
-          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/android-build.log"
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug --continue --stacktrace 2>&1 | tee "$RUNNER_TEMP/android-build.log"
       - name: Create disposable release-test key
         run: |
           PASSWORD="$(openssl rand -hex 24)"
@@ -97,10 +97,20 @@ jobs:
           script: |
             const fs = require('fs');
             const path = process.env.RUNNER_TEMP + '/android-build.log';
-            const log = fs.existsSync(path) ? fs.readFileSync(path, 'utf8').slice(-50000) : 'Build failed before the compile step.';
+            let log = fs.existsSync(path) ? fs.readFileSync(path, 'utf8').slice(-45000) : 'Build failed before the compile step.';
+            const extras = [];
+            const testDir = 'android/app/build/test-results/testDebugUnitTest';
+            if (fs.existsSync(testDir)) for (const f of fs.readdirSync(testDir).filter(f => f.endsWith('.xml'))) {
+              const xml = fs.readFileSync(testDir + '/' + f, 'utf8');
+              if (xml.includes('<failure')) extras.push(xml.slice(0, 12000));
+            }
+            for (const f of ['android/app/build/reports/lint-results-debug.txt', 'android/app/build/reports/lint-results-debug.xml']) {
+              if (fs.existsSync(f)) extras.push(fs.readFileSync(f, 'utf8').slice(0, 12000));
+            }
+            if (extras.length) log += '\n\n--- test/lint details ---\n' + extras.join('\n').slice(0, 18000);
             await github.rest.checks.create({owner: context.repo.owner, repo: context.repo.repo,
               name: 'Android compiler diagnostics', head_sha: context.sha, status: 'completed', conclusion: 'failure',
-              output: {title: 'Android build diagnostics', summary: '```text\n' + log + '\n```'}});
+              output: {title: 'Android build diagnostics', summary: '```text\n' + log.slice(0, 64000) + '\n```'}});
 
   emulator:
     needs: build
