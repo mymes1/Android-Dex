@@ -101,9 +101,11 @@ fun DesktopScreen(vm: DesktopViewModel, onReviewSetup: () -> Unit) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) { vm.appsRepository.invalidateIcons(); vm.refreshApps() }
         }
-        context.registerReceiver(receiver, IntentFilter().apply {
+        val filter = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED); addAction(Intent.ACTION_PACKAGE_REPLACED); addDataScheme("package")
-        }, Context.RECEIVER_NOT_EXPORTED)
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 33) context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        else context.registerReceiver(receiver, filter)
         onDispose { context.unregisterReceiver(receiver) }
     }
     BackHandler(enabled = start || tray || menu != null) { start = false; tray = false; menu = null }

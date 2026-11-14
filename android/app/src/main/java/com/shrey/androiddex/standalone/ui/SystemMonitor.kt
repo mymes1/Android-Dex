@@ -33,7 +33,9 @@ fun rememberSystemStatus(): SystemStatus {
             status = status.copy(battery = if (level >= 0 && scale > 0) (level * 100 / scale).coerceIn(0, 100) else -1, charging = charging)
         }
         val receiver = object : BroadcastReceiver() { override fun onReceive(c: Context?, i: Intent?) { battery(i) } }
-        battery(context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED), Context.RECEIVER_NOT_EXPORTED))
+        val batteryIntent = if (android.os.Build.VERSION.SDK_INT >= 33) context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED), Context.RECEIVER_NOT_EXPORTED)
+            else context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        battery(batteryIntent)
         val connectivity = context.getSystemService(ConnectivityManager::class.java)
         var defaultNetwork: Network? = null
         val callback = object : ConnectivityManager.NetworkCallback() {

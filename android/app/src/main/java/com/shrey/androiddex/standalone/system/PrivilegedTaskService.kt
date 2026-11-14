@@ -22,7 +22,7 @@ class PrivilegedTaskService : IDesktopTaskBridge.Stub {
         Thread(runnable, "dex-shell-command").apply { isDaemon = true }
     }
 
-    @Volatile private var currentProcess: Process? = null
+    @Volatile private var currentProcess: java.lang.Process? = null
 
     override fun destroy() {
         currentProcess?.destroyForcibly()
