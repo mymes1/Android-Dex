@@ -29,6 +29,11 @@ class ShizukuDeviceWorkflowTest {
     }
     @After fun teardown() { scenario.close() }
 
+    private fun awaitRealCondition(timeoutMillis: Long, condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        while (!condition() && System.currentTimeMillis() < deadline) Thread.sleep(100)
+    }
+
     @Test fun officialAuthorizationDialogAndShellTaskBridge() {
         Assume.assumeTrue("Official Shizuku must be installed by the test harness",
             runCatching { context.packageManager.getApplicationInfo("moe.shizuku.privileged.api", 0) }.isSuccess)
@@ -37,7 +42,7 @@ class ShizukuDeviceWorkflowTest {
         compose.onNodeWithText("Skip for now").performClick()
         compose.onNodeWithText("Enter desktop").performClick()
         compose.onNodeWithText("Settings", substring = false).performClick()
-        compose.waitUntil(15000) { ShizukuManager.state.value.binderAlive }
+        awaitRealCondition(15000) { ShizukuManager.state.value.binderAlive }
         assertTrue("The real Shizuku binder should be detected", ShizukuManager.state.value.binderAlive)
         if (!ShizukuManager.state.value.authorized) {
             compose.onNodeWithText("Request permission").performScrollTo().performClick()
@@ -46,7 +51,7 @@ class ShizukuDeviceWorkflowTest {
             assertTrue("Official Shizuku Allow button must appear", allow.waitForExists(10000))
             allow.click()
         }
-        compose.waitUntil(20000) { ShizukuManager.state.value.authorized && ShizukuManager.state.value.bridgeReady }
+        awaitRealCondition(20000) { ShizukuManager.state.value.authorized && ShizukuManager.state.value.bridgeReady }
         assertTrue("Permission must come from the official dialog", ShizukuManager.state.value.authorized)
         assertTrue("The non-daemon shell UserService must connect", ShizukuManager.state.value.bridgeReady)
         val tasks = runBlocking { ShizukuManager.tasks(0) }

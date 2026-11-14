@@ -73,12 +73,19 @@ adb install -r "$APK_DIR/app-debug-androidTest.apk"
 
 # Test-harness-only authorization on a disposable emulator. Application code never writes these settings.
 step 'Enabling real AccessibilityService through test-harness ADB'
+adb shell am force-stop "$DEBUG_PACKAGE"
 adb shell settings put secure enabled_accessibility_services "$SERVICE"
 adb shell settings put secure accessibility_enabled 1
 adb shell am start -W -n "$DEBUG_PACKAGE/com.shrey.androiddex.standalone.MainActivity" > "$REPORT_DIR/debug-startup.txt"
-sleep 2
+sleep 3
 adb shell settings get secure enabled_accessibility_services | tee "$REPORT_DIR/accessibility-setting.txt"
 grep -q "$SERVICE" "$REPORT_DIR/accessibility-setting.txt"
+adb shell dumpsys accessibility > "$REPORT_DIR/accessibility-before-tests.txt"
+adb logcat -d -s AndroidRuntime:E > "$REPORT_DIR/accessibility-crash.txt" || true
+if grep -q 'Crashed services:{{.*DesktopAccessibilityService' "$REPORT_DIR/accessibility-before-tests.txt" || grep -Eq 'FATAL EXCEPTION|DesktopAccessibilityService' "$REPORT_DIR/accessibility-crash.txt"; then
+  echo 'AccessibilityService crashed before instrumentation' >&2
+  exit 1
+fi
 
 step 'Running desktop/Accessibility instrumentation'
 set +e

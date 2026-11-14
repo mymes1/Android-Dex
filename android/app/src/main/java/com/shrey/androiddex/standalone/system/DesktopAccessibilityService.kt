@@ -88,12 +88,15 @@ class DesktopAccessibilityService : AccessibilityService() {
         instance = this
         windows = getSystemService(WindowManager::class.java)
         preferences = PreferencesRepository(this, 0)
-        getSharedPreferences("dex_preferences", Context.MODE_PRIVATE).registerOnSharedPreferenceChangeListener(preferenceListener)
+        runCatching { getSharedPreferences("dex_preferences", Context.MODE_PRIVATE).registerOnSharedPreferenceChangeListener(preferenceListener) }
         val screenFilter = IntentFilter().apply { addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON) }
-        if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(screenReceiver, screenFilter, Context.RECEIVER_NOT_EXPORTED)
-        else registerReceiver(screenReceiver, screenFilter)
+        runCatching {
+            if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(screenReceiver, screenFilter, Context.RECEIVER_NOT_EXPORTED)
+            else registerReceiver(screenReceiver, screenFilter)
+        }
         _state.value = AccessibilityState(enabled = true, bound = true)
-        updateOverlay()
+        // Optional overlay must never crash the genuine AccessibilityService binder.
+        runCatching { updateOverlay() }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {

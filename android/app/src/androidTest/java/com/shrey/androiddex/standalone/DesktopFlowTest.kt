@@ -52,7 +52,7 @@ class DesktopFlowTest {
         compose.waitUntil(6000) { PreferencesRepository(context, 0).notes().any { it.text == "Hello from the tablet" } }
         compose.onNodeWithContentDescription("Close Notes", substring = true).performClick()
         compose.onNodeWithText("Notes", substring = false).performClick()
-        compose.onNodeWithText("Hello from the tablet").assertIsDisplayed()
+        compose.onNode(hasSetTextAction()).assertTextContains("Hello from the tablet")
     }
 
     @Test fun windowControlsAndTaskbarRestoreWork() {
@@ -70,8 +70,8 @@ class DesktopFlowTest {
     @Test fun startSearchAndKeyboardShortcutsWork() {
         enterDesktop()
         compose.onNodeWithContentDescription("Start menu").performClick()
-        compose.onNodeWithText("Search applications").performTextInput("settings")
-        compose.onNodeWithText("Search applications").assertTextContains("settings")
+        compose.onNode(hasSetTextAction()).performTextInput("settings")
+        compose.onNode(hasSetTextAction()).assertTextContains("settings")
         compose.onRoot().performKeyInput { pressKey(Key.Escape) }
         compose.onNodeWithText("Your applications").assertDoesNotExist()
         compose.onRoot().performKeyInput { pressKey(Key.MetaLeft) }
@@ -93,7 +93,10 @@ class DesktopFlowTest {
 
     @Test fun accessibilityActivationIsObservedWhenTestHarnessEnablesIt() {
         Assume.assumeTrue("CI enables the real service using test-only ADB before this test", DesktopAccessibilityService.isEnabled(context))
-        compose.waitUntil(10000) { DesktopAccessibilityService.connected() }
+        // The service is bound by Android in the app process; Compose idling does not advance that binder callback.
+        val deadline = System.currentTimeMillis() + 15000
+        while (!DesktopAccessibilityService.connected() && System.currentTimeMillis() < deadline) Thread.sleep(100)
+        assertTrue("Android should bind the enabled AccessibilityService", DesktopAccessibilityService.connected())
         assertTrue(DesktopAccessibilityService.state.value.bound)
         enterDesktop()
         compose.onNodeWithText("Settings", substring = false).performClick()
