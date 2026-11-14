@@ -1,157 +1,68 @@
+# Shrey's Android DeX — Standalone Android Edition
+
+**The Android app is now the primary implementation in this repository.** It runs directly on an Android 11+ tablet: no computer, remote desktop, emulator, root, Samsung DeX firmware support or PC connection is needed for normal use.
+
+> [!IMPORTANT]
+> The starting checkout contained the distribution website, artwork and architecture specifications—not the proprietary Flutter/Kotlin source described by those documents. This branch adds a real native Kotlin/Jetpack Compose application under [`android/`](android/). The original website, media, license and historical PC documentation are retained. This is not a claim that the missing PC implementation was ported.
+
+## Android app
+
+- Native APK, dark graphite desktop, wallpaper selection, draggable shortcuts and right-click menus.
+- Real draggable/resizable/minimizable/maximizable windows for Notes, Files, Calculator, App Library, Settings and Device information.
+- Bottom taskbar, searchable Start menu, installed apps, pins, local recent launches, battery, connectivity, clock, volume and quick settings.
+- Official Shizuku API 13.1.5 integration: installation/service detection, real authorization requests, denial/revocation handling, reconnect/troubleshooting UI and an on-demand shell task bridge.
+- Optional, genuine Accessibility Service for foreground changes, Back/Home/Recents/Lock, a return/navigation overlay and a privacy-preserving control inspector.
+- Touch, Android's hardware mouse cursor, Bluetooth/USB keyboards and mice, trackpads, keyboard shortcuts and runtime-detected Android displays.
+- Local-only notes and preferences; user-selected folder access through Storage Access Framework; no INTERNET or broad storage permission.
+
+### Important Android limits
+
+Other Android apps are **launched and switched**, not illegally embedded inside this APK. Their fullscreen/split-screen/freeform behavior belongs to Android. Native freeform is offered only after live capability checks and Shizuku authorization, and firmware may still override it. The app does not show fake window controls for third-party activities.
+
+The target **Galaxy Tab A9 Wi-Fi (SM-X110)** has USB 2.0 and no MHL video output; a passive USB-C HDMI adapter cannot add wired desktop video. See [device compatibility](doc/STANDALONE_COMPATIBILITY.md).
+
+## Install and set up
+
+1. Obtain the APK. The [Android CI workflow](https://github.com/mymes1/Android-Dex/actions/workflows/android.yml) publishes a clearly labeled **TEST-RELEASE** artifact after a successful build. It is an optimized release build signed with a disposable CI test key, suitable for fresh installation/testing—not a production-signed distribution or a stable upgrade key.
+2. Open the APK on the tablet and allow installation from that source through Android's normal prompt.
+3. Follow the in-app setup. For advanced features, install the official [Shizuku](https://github.com/RikkaApps/Shizuku/releases/latest), enable Wireless debugging, pair/start Shizuku, then request permission in DeX.
+4. Optionally enable **DeX desktop navigation** in Android Accessibility settings.
+5. Enter the desktop. Optional permissions can be skipped; setup does not reappear on every launch.
+
+**After a reboot, Shizuku must be started again using Wireless debugging.** DeX detects this and keeps normal desktop tools available. Detailed Samsung setup and recovery instructions: [Setup guide](doc/STANDALONE_SETUP.md).
+
+## Build from source
+
+Requirements: JDK 17, Android SDK 35 and Build Tools 35.0.0. Gradle 8.14 is supplied by the wrapper; AGP 8.10.1 and Kotlin 2.1.21 are pinned.
+
+```sh
+cd android
+./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+./gradlew :app:assembleRelease
+```
+
+Debug APK: `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+A local release is **unsigned** unless all four signing environment variables are supplied: `DEX_KEYSTORE`, `DEX_KEYSTORE_PASSWORD`, `DEX_KEY_ALIAS`, `DEX_KEY_PASSWORD`. Never commit a keystore. See [Android build and architecture](android/README.md).
+
+A computer/ADB may be used once to build or sideload during development; it is never a runtime dependency of the application.
+
+## Documentation
+
+| Document | Purpose |
+| --- | --- |
+| [Android module](android/README.md) | Build, architecture, permissions, tests and signing |
+| [Implementation audit/plan](doc/STANDALONE_IMPLEMENTATION_PLAN.md) | What was actually present and the implementation decisions |
+| [Standalone setup](doc/STANDALONE_SETUP.md) | Wireless ADB, Shizuku, Accessibility and recovery |
+| [Compatibility](doc/STANDALONE_COMPATIBILITY.md) | Real platform limits and SM-X110 hardware notes |
+| [Verification](doc/STANDALONE_TEST_REPORT.md) | CI evidence and remaining physical-device acceptance tests |
+| [Security/privacy](SECURITY.md) | Local data, permission boundaries and shell bridge |
+
+## Legacy PC edition and original project materials
+
+The original [website](index.html), [download page](download.html), [screenshots/video](Data/) and [historical architecture documents](doc/) remain available. Those documents describe the separate, closed-source Windows/Linux/macOS client using Flutter, ADB, scrcpy, a shell JAR and a companion APK. That source was not in this checkout; legacy gaming maps, per-app audio and PC mirroring are not claimed as implemented standalone features.
+
+Original project by [Shrey113](https://github.com/Shrey113). The original proprietary [LICENSE](LICENSE), [NOTICE](NOTICE) and official-upstream distribution warning are retained. This fork's standalone implementation does not grant rights to relicense or commercially redistribute the original proprietary project. Third-party components retain their own licenses; see [android/THIRD_PARTY_NOTICES.md](android/THIRD_PARTY_NOTICES.md).
+
 > [!WARNING]
-> **Official Distribution Only:** This GitHub repository (<https://github.com/Shrey113/Android-Dex>) is the **only official and authorized source** for Android DEX.
-
-# Android DEX
-
-<img src="Data/app_png.png" width="128" height="128" alt="Android DEX" align="right" />
-
-_Transform your Android device into a complete desktop experience._
-
-Android DEX is a free, closed-source desktop application for **Windows, Linux, and macOS** that lets you run Android apps in resizable desktop-style windows, mirror screens, stream per-app audio, manage notifications, control media playback, and game with native keyboard and mouse input — all using high-performance ADB and companion services over USB or Wi-Fi.
-
-<p>
-  <img src="https://img.shields.io/badge/Flutter-02569B?style=flat-square&logo=flutter&logoColor=fff" alt="Flutter" />
-  <img src="https://img.shields.io/badge/Kotlin-%237F52FF.svg?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
-  <img src="https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
-  <img src="https://img.shields.io/badge/License-Closed%20Source-blue?style=flat-square" alt="Closed Source" />
-</p>
-
-<a href="https://www.buymeacoffee.com/Shrey113" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" style="height: 60px !important;width: 217px !important;" ></a>
-
----
-
-### Download Android DEX
-
-| Platform | Download |
-| :--- | :--- |
-| Windows | [Download](https://github.com/Shrey113/Android-Dex/releases/latest/download/Android_Dex_Windows.zip) |
-| Linux | [Download](https://github.com/Shrey113/Android-Dex/releases/latest/download/Android_Dex_Linux.zip) |
-| macOS | [Download](https://github.com/Shrey113/Android-Dex/releases/latest/download/Android_Dex_macOS.zip) |
-
----
-
-## App Preview
-
-<div align="center">
-
-**Desktop Home Interface**
-![Home Screen](Data/home_screen.png)
-
-<br>
-
-| ![App List](Data/App_list.png) | ![Multiple Apps](Data/multiple_apps_running.png) |
-|:---:|:---:|
-| **App Dashboard** | **Multi-App View** |
-
-| ![Media Control](Data/media_control.png) | ![Controller 1](Data/controller_1.png) |
-|:---:|:---:|
-| **Media Center** | **Android Control** |
-
-| ![Controller 2](Data/controller_2.png) | ![Controller 3](Data/controller_3.png) |
-|:---:|:---:|
-| **Audio Overlay** | **Media Preferences** |
-
-</div>
-
----
-
-### Keyboard Shortcuts
-
-Boost your productivity with built-in keyboard shortcuts for the most common actions:
-
-| Shortcut | Action |
-| :---: | :--- |
-| `Ctrl + G` | Toggle Game Controls / Gaming Mode for current app |
-| `Ctrl + F` | Enter / Toggle Fullscreen |
-| `Esc` | Exit Fullscreen |
-| `Ctrl + Alt + Up` / `Down` | System-level hotkey to Show / Hide Android DEX |
-| `Ctrl + Alt + Left` / `Right` | Switch active device / Open device switcher panel |
-
----
-
-### Gaming Mode (No Emulator Detection)
-
-Experience true desktop-grade gaming with zero emulator detection. Because games execute directly on your physical Android hardware and touch events are passed via low-level native protocols, anti-cheat systems recognize your device as a genuine mobile phone—giving you full access to native mobile lobbies without emulator bans or restrictions.
-
-| Control / Button | Description |
-| :--- | :--- |
-| **Tap Spot Button** | Single tap or turbo rapid-fire mapped to any keyboard key or mouse click at exact screen coordinates |
-| **D-Pad / Joystick** | 8-directional movement (WASD) with adjustable radius, deadzone, sprint zone, and analog smoothing |
-| **FPS Mouse Lock & Gyro Aim** | True 360° FPS camera control with cursor locking and gyroscope sensor emulation for precision aiming |
-| **Right-Click Aim / ADS** | Dedicated Right-Click trigger for instant Scope / Aim-Down-Sights (ADS) or secondary action toggle |
-| **Swipe & Skill Trigger** | Directional swipe gestures, skill casting, and flick mechanics bound to single key presses |
-| **Script & Combo Macro** | Multi-step automated touch sequences (tap combos, delays, and directional swipes) mapped to a single key |
-| **Game Profile Manager** | Create, save, and auto-load customized control layouts per game with local database storage |
-
----
-
-### Technologies & Dependencies
-
-Android DEX is a closed-source application built on top of industry-standard open-source libraries and native platform frameworks:
-
-* **[ADB — Android Debug Bridge](https://developer.android.com/tools/releases/platform-tools)** – Core protocol for device communication, wireless pairing, and ADB command execution.
-* **[scrcpy](https://github.com/Genymobile/scrcpy)** – High-performance, low-latency screen mirroring and remote input control for Android devices.
-* **[Flutter](https://flutter.dev/)** – Cross-platform UI framework used to build the desktop client.
-* **[Kotlin](https://kotlinlang.org/)** – Powers the companion Android service, media listener, and settings UI.
-
-> Special thanks to **[rom1v](https://github.com/rom1v)** for their foundational contributions to the open-source ADB and scrcpy ecosystems, which provided critical architectural insights for this project.
-
----
-
-### Official Documentation & Resources
-
-| Category | Resource |
-| :--- | :--- |
-| Architectural Design | [Read the Architecture Specs](doc/ARCHITECTURE.md) |
-| Boot & Handshake Flow | [View Boot & Initialization Flow](doc/BOOT_FLOW.md) |
-| Reconnection System | [View Reconnection & Auto-Healing Guide](doc/RECONNECTION.md) |
-| Real-Time Data Model | [Read the Data Model & Telemetry Specs](doc/DATA_MODEL.md) |
-| Error & Fallback Handling | [View Error Handling & Diagnostic Reference](doc/ERROR_HANDLING.md) |
-| System Modules | [View System Module Directory](doc/MODULES.md) |
-| Device Manager | [View Device Manager Reference](doc/DEVICE_MANAGER.md) |
-| Security & Privacy Policy | [View Security & Privacy Policy](SECURITY.md) |
-
----
-
-### Security & Privacy
-
-Your privacy and security are foundational:
-
-* **100% Local Processing:** All screen mirroring, audio streaming, touch/keyboard input, and notification management occur strictly locally between your desktop and your Android device.
-* **Zero Data Collection:** Android DEX does **not** collect, track, monitor, or harvest any personal data, keystrokes, device IDs, screen content, or telemetry.
-* **No Cloud / Completely Offline:** Android DEX does not communicate with external servers or cloud endpoints. It functions entirely without an internet connection.
-* **Direct Local Connection:** All device communication is handled directly through standard ADB over your local USB cable or local Wi-Fi network with zero third-party intermediaries.
-
-See [SECURITY.md](SECURITY.md) for the full Security & Privacy Policy.
-
----
-
-### License
-
-Android DEX is proprietary, closed-source software.
-
-Users may use Android DEX for personal, educational, research, and testing purposes.
-
-Users may create, publish, and share non-commercial videos, tutorials, reviews, demonstrations, screenshots, and other content featuring Android DEX. Such content must not be monetized or used to generate advertising revenue, sponsorship income, affiliate commissions, paid promotions, memberships, donations, or other commercial income.
-
-> [!CAUTION]
-> **Strict Prohibition on Monetized Websites & Mirrors:**
-> Creating websites, download portals, landing pages, or mirror services to distribute or promote Android DEX for commercial gain (including ad revenue via Google AdSense, banners, popups, paywalls, link shorteners, or paid download gateways) is **strictly prohibited**. Bundling or wrapping Android DEX with third-party installers, download managers, adware, toolbars, or commercial software suites is strictly forbidden.
-
-Redistribution, modification, repackaging, commercial use, commercial distribution, and unauthorized mirroring of Android DEX are prohibited unless explicitly authorized in writing by the copyright holder.
-
-For commercial licensing inquiries or written monetization permissions, please contact [@Shrey113](https://github.com/Shrey113).
-
-Third-party open-source components, including scrcpy, remain subject to their respective licenses.
-
-See [LICENSE](LICENSE), [NOTICE](NOTICE), and [SECURITY.md](SECURITY.md) for complete details.
-
----
-
-<div align="center">
-
-### Thanks for using Android DEX! 🎉
-
-**Made by [Shrey113](https://github.com/Shrey113)**
-
-</div>
+> The original upstream repository is <https://github.com/Shrey113/Android-Dex>. Do not mistake this implementation branch for an upstream proprietary desktop release. Shizuku is a separate official RikkaApps application; never enter debugging codes into an app you do not trust.

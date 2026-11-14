@@ -6,6 +6,7 @@ import android.media.AudioManager
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -41,7 +42,7 @@ fun StartMenu(vm: DesktopViewModel, onDismiss: () -> Unit, modifier: Modifier = 
             HorizontalDivider(color = DexBorder)
             Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { vm.openTool(WindowKind.SETTINGS); onDismiss() }) { Icon(Icons.Default.Settings, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Settings", fontSize = 12.sp) }
-                TextButton(onClick = { vm.openTool(WindowKind.TASKS); onDismiss() }) { Icon(Icons.Default.SwitchApps, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Tasks", fontSize = 12.sp) }
+                TextButton(onClick = { vm.openTool(WindowKind.TASKS); onDismiss() }) { Icon(Icons.Default.SwapHoriz, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Tasks", fontSize = 12.sp) }
                 Spacer(Modifier.weight(1f))
                 Box {
                     IconButton(onClick = { power = true }) { Icon(Icons.Default.PowerSettingsNew, "Power and session options") }

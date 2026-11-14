@@ -29,7 +29,7 @@ fun rememberSystemStatus(): SystemStatus {
             if (intent == null) return
             val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
             val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-            val charging = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1).let { it == BatteryManager.EXTRA_STATUS_CHARGING || it == BatteryManager.EXTRA_STATUS_FULL }
+            val charging = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1).let { it == BatteryManager.BATTERY_STATUS_CHARGING || it == BatteryManager.BATTERY_STATUS_FULL }
             status = status.copy(battery = if (level >= 0 && scale > 0) (level * 100 / scale).coerceIn(0, 100) else -1, charging = charging)
         }
         val receiver = object : BroadcastReceiver() { override fun onReceive(c: Context?, i: Intent?) { battery(i) } }
@@ -51,7 +51,7 @@ fun rememberSystemStatus(): SystemStatus {
         }
         val inputs = context.getSystemService(InputManager::class.java)
         fun refreshInputs() {
-            val devices = InputDevice.getDeviceIds().mapNotNull { InputDevice.getDevice(it) }.filter { !it.isVirtual }
+            val devices = (inputs?.inputDeviceIds ?: IntArray(0)).mapNotNull { InputDevice.getDevice(it) }.filter { !it.isVirtual }
             status = status.copy(keyboard = devices.any { it.supportsSource(InputDevice.SOURCE_KEYBOARD) },
                 mouse = devices.any { it.supportsSource(InputDevice.SOURCE_MOUSE) },
                 trackpad = devices.any { it.supportsSource(InputDevice.SOURCE_TOUCHPAD) })

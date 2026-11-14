@@ -217,7 +217,7 @@ fun TasksContent(vm: DesktopViewModel) {
             IconButton(onClick = vm::refreshTasks) { Icon(Icons.Default.Refresh, "Refresh Android tasks") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ActionButton("Android Recents", Icons.Default.SwitchApps) { vm.showRecents() }
+            ActionButton("Android Recents", Icons.Default.SwapHoriz) { vm.showRecents() }
             if (!shizuku.bridgeReady) TextButton(onClick = { vm.openTool(WindowKind.SETTINGS) }) { Text("Set up Shizuku") }
         }
         if (!known) Text(error, color = DexMuted, fontSize = 12.sp)

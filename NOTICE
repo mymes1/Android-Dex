@@ -16,3 +16,14 @@ the distributed third-party components.
 
 The Android-Dex project is not affiliated with or endorsed by
 Genymobile.
+
+STANDALONE ANDROID EDITION (this implementation branch)
+
+The native Android module does not bundle scrcpy, Flutter, ADB executables,
+or the legacy PC logic engine. It uses the official Shizuku API/provider
+(MIT, Copyright (c) 2021 RikkaW), Kotlin and AndroidX/Jetpack Compose
+(Apache License 2.0). See android/THIRD_PARTY_NOTICES.md and the license
+texts under android/app/src/main/assets/licenses/.
+
+The original proprietary project license is retained. This notice does not
+relicense the original project or grant commercial redistribution rights.

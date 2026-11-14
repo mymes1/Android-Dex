@@ -14,6 +14,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -176,7 +178,7 @@ fun DesktopScreen(vm: DesktopViewModel, onReviewSetup: () -> Unit) {
             if (tray) QuickTray(vm, status, { tray = false }, Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 72.dp)
                 .width(minOf(maxWidth - 16.dp, 340.dp)).heightIn(max = (areaHeight - 12).coerceAtLeast(1f).dp))
             menu?.let { target ->
-                Box(Modifier.offset(target.x.dp.coerceIn(0.dp, (maxWidth - 2).dp), target.y.dp.coerceIn(0.dp, (maxHeight - 2).dp)).size(1.dp)) {
+                Box(Modifier.offset(target.x.dp.coerceIn(0.dp, maxWidth - 2.dp), target.y.dp.coerceIn(0.dp, maxHeight - 2.dp)).size(1.dp)) {
                     DropdownMenu(expanded = true, onDismissRequest = { menu = null }) {
                         val shortcut = target.shortcut
                         if (shortcut != null) {
@@ -274,7 +276,7 @@ private fun Taskbar(vm: DesktopViewModel, status: SystemStatus, windows: List<De
                     Button(onClick = { if (active) vm.minimize(window.id) else vm.focus(window.id) }, modifier = Modifier.height(44.dp).widthIn(max = if (width > 700) 155.dp else 52.dp).semantics { contentDescription = "Taskbar ${window.title}" },
                         contentPadding = PaddingValues(horizontal = 10.dp), shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = if (active) DexRaised else Color.Transparent, contentColor = if (active) Color.White else DexMuted)) {
-                        Column(horizontalAlignment = Alignment.CenterVertically) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Icon(toolIcon(window.kind), null, Modifier.size(18.dp))
                                 if (width > 700) Text(window.title.removePrefix("Notes · "), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -307,6 +309,6 @@ private fun toolIcon(kind: WindowKind): ImageVector = when (kind) {
     WindowKind.CALCULATOR -> Icons.Default.Calculate
     WindowKind.SETTINGS -> Icons.Default.Settings
     WindowKind.APPS -> Icons.Default.Apps
-    WindowKind.TASKS -> Icons.Default.SwitchApps
+    WindowKind.TASKS -> Icons.Default.SwapHoriz
     WindowKind.DEVICE -> Icons.Default.TabletAndroid
 }

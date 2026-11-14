@@ -65,8 +65,9 @@ class PreferencesRepository(context: Context, val displayId: Int) {
         editor.apply()
     }
 
-    fun notes(): List<Note> = global.getStringSet("note_ids", emptySet())!!.mapNotNull { id ->
-        if (!global.contains("note_$id")) null else Note(id, global.getString("note_$id", ""), global.getLong("note_time_$id", 0))
+    fun notes(): List<Note> = global.getStringSet("note_ids", emptySet())!!.mapNotNull { value ->
+        val id = value ?: return@mapNotNull null
+        if (!global.contains("note_$id")) null else Note(id, global.getString("note_$id", "") ?: "", global.getLong("note_time_$id", 0))
     }.sortedByDescending { it.updatedAt }
     fun note(id: String): String = global.getString("note_$id", "") ?: ""
     fun createNote(): String {

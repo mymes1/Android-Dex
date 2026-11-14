@@ -2,7 +2,7 @@ package com.shrey.androiddex.standalone.data
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ActivityInfo
+
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -55,15 +55,7 @@ class AppRepository(private val context: Context) {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }.getOrNull()
 
-    fun resizeDescription(entry: AppEntry): String = runCatching {
-        when (packageManager.getActivityInfo(android.content.ComponentName.unflattenFromString(entry.component)!!, 0).resizeMode) {
-            ActivityInfo.RESIZE_MODE_RESIZABLE -> "Activity reports resizable"
-            ActivityInfo.RESIZE_MODE_UNRESIZEABLE -> "Activity reports fixed size"
-            ActivityInfo.RESIZE_MODE_FORCE_RESIZABLE_PORTRAIT -> "System may force portrait resizing"
-            ActivityInfo.RESIZE_MODE_FORCE_RESIZABLE_LANDSCAPE -> "System may force landscape resizing"
-            ActivityInfo.RESIZE_MODE_FORCE_RESIZABLE_PRESERVE_ORIENTATION -> "System may force resizing, preserving orientation"
-            ActivityInfo.RESIZE_MODE_FORCE_RESIZEABLE -> "System may force resizing"
-            else -> "Activity does not report a resize mode"
-        }
-    }.getOrDefault("Resize information unavailable")
+    // ActivityInfo.resizeMode is not a public SDK field. Actual task resizability is
+    // reported by the authorized shell task bridge; never guess it in the app process.
+    fun resizeDescription(entry: AppEntry): String = "Android decides resize behavior at launch"
 }
