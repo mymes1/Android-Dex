@@ -69,7 +69,9 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     }
 
     private fun change(persist: Boolean = true, block: (List<DesktopWindow>) -> List<DesktopWindow>) {
-        _windows.value = block(_windows.value)
+        val updated = block(_windows.value)
+        if (updated == _windows.value) return
+        _windows.value = updated
         if (_focused.value !in _windows.value.map { it.id }) _focused.value = _windows.value.lastOrNull { !it.minimized }?.id
         if (persist) persist()
     }

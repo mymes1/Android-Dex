@@ -90,7 +90,10 @@ fun DesktopScreen(vm: DesktopViewModel, onReviewSetup: () -> Unit) {
     LaunchedEffect(settings.wallpaper, settings.wallpaperRevision) {
         wallpaper = if (settings.wallpaper == -1) WallpaperStore.load(context)?.asImageBitmap() else null
     }
-    DisposableEffect(wallpaper) { onDispose { wallpaper?.asAndroidBitmap()?.recycle() } }
+    DisposableEffect(wallpaper) {
+        val disposableBitmap = wallpaper?.asAndroidBitmap()
+        onDispose { disposableBitmap?.recycle() }
+    }
     LaunchedEffect(vm) { vm.messages.collect { snackbar.showSnackbar(it) } }
     LaunchedEffect(shizuku.bridgeReady) { vm.probeCapabilities(); vm.refreshTasks() }
     LaunchedEffect(Unit) { rootFocus.requestFocus() }
@@ -138,7 +141,7 @@ fun DesktopScreen(vm: DesktopViewModel, onReviewSetup: () -> Unit) {
                     key(shortcut.key, iconRevision) {
                         val initial = vm.preferences.iconPosition(shortcut.key) ?: ((index % columns) * 94f + 6f to (index / columns) * 103f + 8f)
                         var position by remember(shortcut.key, iconRevision) { mutableStateOf(Offset(initial.first.coerceIn(0f, (areaWidth - 90).coerceAtLeast(0f)), initial.second.coerceIn(0f, (areaHeight - 100).coerceAtLeast(0f)))) }
-                        Column(Modifier.offset { androidx.compose.ui.unit.IntOffset(position.x.toInt(), position.y.toInt()) }.width(90.dp).height(100.dp)
+                        Column(Modifier.offset { androidx.compose.ui.unit.IntOffset((position.x * density).toInt(), (position.y * density).toInt()) }.width(90.dp).height(100.dp)
                             .clip(RoundedCornerShape(12.dp)).combinedClickable(onClick = {
                                 if (shortcut.kind != null) vm.openTool(shortcut.kind) else shortcut.app?.let(vm::launchApp)
                             }, onLongClick = { menu = MenuTarget(position.x + 45, position.y + 45, shortcut) })

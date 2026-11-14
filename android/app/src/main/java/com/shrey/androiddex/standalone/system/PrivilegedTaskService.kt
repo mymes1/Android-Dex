@@ -22,7 +22,10 @@ class PrivilegedTaskService : IDesktopTaskBridge.Stub {
         Thread(runnable, "dex-shell-command").apply { isDaemon = true }
     }
 
+    @Volatile private var currentProcess: Process? = null
+
     override fun destroy() {
+        currentProcess?.destroyForcibly()
         executor.shutdownNow()
         System.exit(0)
     }
@@ -141,6 +144,7 @@ class PrivilegedTaskService : IDesktopTaskBridge.Stub {
 
     private fun command(arguments: List<String>): String {
         val process = ProcessBuilder(arguments).redirectErrorStream(true).start()
+        currentProcess = process
         val future = executor.submit(Callable {
             val output = process.inputStream.bufferedReader().use { it.readText() }.take(8192)
             val exit = process.waitFor()
@@ -156,6 +160,8 @@ class PrivilegedTaskService : IDesktopTaskBridge.Stub {
         } catch (e: Exception) {
             process.destroyForcibly()
             throw RemoteException(rootMessage(e))
+        } finally {
+            if (currentProcess === process) currentProcess = null
         }
     }
 }

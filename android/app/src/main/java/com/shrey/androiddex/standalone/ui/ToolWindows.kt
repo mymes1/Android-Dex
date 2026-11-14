@@ -32,6 +32,7 @@ import com.shrey.androiddex.standalone.data.*
 import com.shrey.androiddex.standalone.system.ShizukuManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
@@ -80,6 +81,7 @@ private data class FileItem(val uri: Uri, val id: String, val name: String, val 
 @Composable
 fun FilesContent(vm: DesktopViewModel) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var root by remember { mutableStateOf(vm.preferences.savedFolder()?.let(Uri::parse)) }
     val path = remember(root) { mutableStateListOf<Uri>().apply { root?.let { add(it) } } }
     var items by remember { mutableStateOf<List<FileItem>>(emptyList()) }
@@ -145,12 +147,21 @@ fun FilesContent(vm: DesktopViewModel) {
     if (create) AlertDialog(onDismissRequest = { create = false }, title = { Text("Create a text file") },
         text = { OutlinedTextField(fileName, { fileName = it }, label = { Text("File name") }, singleLine = true) },
         confirmButton = { TextButton(enabled = fileName.isNotBlank() && !fileName.contains('/') && current != null, onClick = {
-            runCatching { DocumentsContract.createDocument(context.contentResolver, current!!, "text/plain", fileName.trim()) }
-                .onSuccess { create = false; revision++; vm.notify("Text file created.") }.onFailure { vm.notify("Android could not create the file here.") }
+            val directory = current ?: return@TextButton
+            val name = fileName.trim()
+            create = false
+            scope.launch {
+                runCatching { withContext(Dispatchers.IO) { DocumentsContract.createDocument(context.contentResolver, directory, "text/plain", name) ?: error("No document created") } }
+                    .onSuccess { revision++; vm.notify("Text file created.") }.onFailure { vm.notify("Android could not create the file here.") }
+            }
         }) { Text("Create") } }, dismissButton = { TextButton(onClick = { create = false }) { Text("Cancel") } })
     delete?.let { item -> AlertDialog(onDismissRequest = { delete = null }, title = { Text("Delete ${item.name}?") }, text = { Text("This deletes the actual file from the folder you selected.") },
         confirmButton = { TextButton(onClick = {
-            runCatching { DocumentsContract.deleteDocument(context.contentResolver, item.uri) }.onSuccess { revision++ }.onFailure { vm.notify("The file could not be deleted.") }; delete = null
+            delete = null
+            scope.launch {
+                runCatching { withContext(Dispatchers.IO) { check(DocumentsContract.deleteDocument(context.contentResolver, item.uri)) { "File was not deleted" } } }
+                    .onSuccess { revision++ }.onFailure { vm.notify("The file could not be deleted.") }
+            }
         }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { delete = null }) { Text("Cancel") } })
     }
 }

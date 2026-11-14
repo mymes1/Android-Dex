@@ -113,6 +113,7 @@ class DesktopAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         cleanup()
+        scope.cancel()
         _state.value = AccessibilityState()
         super.onDestroy()
     }
@@ -120,7 +121,7 @@ class DesktopAccessibilityService : AccessibilityService() {
     private fun cleanup() {
         if (::preferences.isInitialized) getSharedPreferences("dex_preferences", Context.MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(preferenceListener)
         runCatching { unregisterReceiver(screenReceiver) }
-        removePanel(); removeAnchor(); controls.clear(); scope.cancel(); instance = null
+        removePanel(); removeAnchor(); controls.clear(); instance = null
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

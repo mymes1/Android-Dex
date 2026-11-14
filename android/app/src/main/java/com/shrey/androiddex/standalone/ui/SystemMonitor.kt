@@ -35,9 +35,11 @@ fun rememberSystemStatus(): SystemStatus {
         val receiver = object : BroadcastReceiver() { override fun onReceive(c: Context?, i: Intent?) { battery(i) } }
         battery(context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED), Context.RECEIVER_NOT_EXPORTED))
         val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        var defaultNetwork: Network? = null
         val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { status = status.copy(network = "Connected", online = false) }
+            override fun onAvailable(network: Network) { defaultNetwork = network; status = status.copy(network = "Connected", online = false) }
             override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+                defaultNetwork = network
                 val transport = when {
                     capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
                     capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
@@ -47,11 +49,14 @@ fun rememberSystemStatus(): SystemStatus {
                 val validated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
                 status = status.copy(network = if (validated) "$transport · online" else "$transport · no internet", online = validated)
             }
-            override fun onLost(network: Network) { status = status.copy(network = "Offline", online = false) }
+            override fun onLost(network: Network) {
+                if (defaultNetwork == network) { defaultNetwork = null; status = status.copy(network = "Offline", online = false) }
+            }
         }
         val inputs = context.getSystemService(InputManager::class.java)
         fun refreshInputs() {
-            val devices = (inputs?.inputDeviceIds ?: IntArray(0)).mapNotNull { InputDevice.getDevice(it) }.filter { !it.isVirtual }
+            val ids: IntArray = inputs?.getInputDeviceIds() ?: IntArray(0)
+            val devices = ids.toList().mapNotNull { id -> InputDevice.getDevice(id) }.filter { device -> !device.isVirtual }
             status = status.copy(keyboard = devices.any { it.supportsSource(InputDevice.SOURCE_KEYBOARD) },
                 mouse = devices.any { it.supportsSource(InputDevice.SOURCE_MOUSE) },
                 trackpad = devices.any { it.supportsSource(InputDevice.SOURCE_TOUCHPAD) })
