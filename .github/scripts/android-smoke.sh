@@ -96,8 +96,11 @@ adb exec-out screencap -p > "$REPORT_DIR/after-tests.png"
 adb shell dumpsys accessibility > "$REPORT_DIR/accessibility-after-tests.txt" 2>/dev/null || true
 adb logcat -d -s AndroidRuntime:E > "$REPORT_DIR/runtime-after-tests.txt" 2>/dev/null || true
 adb logcat -d | grep -Ei 'DesktopAccessibilityService|AccessibilityService|AndroidRuntime|FATAL EXCEPTION|com.shrey.androiddex.standalone.debug' | tail -300 > "$REPORT_DIR/logcat-accessibility.txt" 2>/dev/null || true
-adb shell settings put secure enabled_accessibility_services ''
-adb shell settings put secure accessibility_enabled 0
+# Best-effort teardown on the disposable emulator. `settings put ... ''` loses the empty
+# argument over adb and exits non-zero, which previously aborted the run under `set -e`
+# even when instrumentation passed; `settings delete` is the correct way to clear the grant.
+adb shell settings delete secure enabled_accessibility_services >/dev/null 2>&1 || true
+adb shell settings put secure accessibility_enabled 0 >/dev/null 2>&1 || true
 if [[ "$INSTRUMENT_STATUS" -ne 0 ]] || ! grep -Eq '^OK \([0-9]+ tests?\)' "$REPORT_DIR/instrumentation.txt"; then
   echo 'Instrumentation tests failed or did not complete' >&2
   exit 1
@@ -114,7 +117,8 @@ if [[ -z "$SHIZUKU_LIB_DIR" ]]; then
   exit 1
 fi
 step 'Starting Shizuku through official native starter'
-adb shell "$SHIZUKU_LIB_DIR/libshizuku.so" | tee "$REPORT_DIR/shizuku-start.txt"
+# Bound the start so a misbehaving starter can never hang the CI job; capture its output.
+timeout 60s adb shell "$SHIZUKU_LIB_DIR/libshizuku.so" 2>&1 | tee "$REPORT_DIR/shizuku-start.txt" || true
 sleep 3
 adb shell ps -A > "$REPORT_DIR/processes.txt" 2>/dev/null || true
 
