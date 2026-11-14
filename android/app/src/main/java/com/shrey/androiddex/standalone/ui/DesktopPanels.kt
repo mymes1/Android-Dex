@@ -66,7 +66,7 @@ fun StartMenu(vm: DesktopViewModel, onDismiss: () -> Unit, modifier: Modifier = 
 }
 
 @Composable
-fun QuickTray(vm: DesktopViewModel, status: SystemStatus, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+fun QuickTray(vm: DesktopViewModel, status: SystemStatus, onDismiss: () -> Unit, modifier: Modifier = Modifier, onSettings: (() -> Unit)? = null) {
     val context = LocalContext.current
     val shizuku by ShizukuManager.state.collectAsStateWithLifecycle()
     val audio = remember { context.getSystemService(AudioManager::class.java) }
@@ -95,7 +95,7 @@ fun QuickTray(vm: DesktopViewModel, status: SystemStatus, onDismiss: () -> Unit,
                     valueRange = 0f..maximum.toFloat(), steps = (maximum - 1).coerceAtLeast(0), modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
                 Text("$volume", fontSize = 11.sp, color = DexMuted)
             }
-            Button(onClick = { vm.openTool(WindowKind.SETTINGS); onDismiss() }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Settings, null, Modifier.size(17.dp)); Spacer(Modifier.width(8.dp)); Text("Desktop settings") }
+            Button(onClick = { if (onSettings != null) onSettings() else { vm.openTool(WindowKind.SETTINGS); onDismiss() } }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Settings, null, Modifier.size(17.dp)); Spacer(Modifier.width(8.dp)); Text("Desktop settings") }
             Text("Wi-Fi and Bluetooth open Android controls; Android 15 does not allow this app to silently toggle them.", color = DexMuted, fontSize = 10.sp)
         }
     }

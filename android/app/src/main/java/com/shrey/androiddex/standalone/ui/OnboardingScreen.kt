@@ -60,19 +60,24 @@ fun OnboardingScreen(vm: DesktopViewModel, onFinish: () -> Unit) {
                             Text("Targeted at Galaxy Tab A9 SM-X110 / Android 15. Features are probed at runtime; Samsung firmware and hardware limits still apply.", color = DexMuted, fontSize = 13.sp)
                         }
                         DexCard(Modifier.fillMaxWidth()) {
-                            SectionTitle("What “windows” means on Android")
-                            Text("Notes, Files, Calculator, Settings and other DeX tools have real draggable, resizable windows. Other Android apps open in Android's own fullscreen, split-screen or supported freeform mode. Shizuku cannot turn arbitrary apps into embedded views inside this APK.", color = DexMuted, fontSize = 13.sp)
-                            Text("There are no fake minimize/maximize controls for third-party apps. When native freeform is unavailable, use the real Android task switcher.", color = DexMuted, fontSize = 13.sp)
+                            SectionTitle("Real apps in real Android windows")
+                            Text("With Shizuku, Android apps can open in native freeform windows over this desktop. The optional Display over other apps dock keeps the original-style taskbar, search, media widget and dark window bars visible while you use those apps.", color = DexMuted, fontSize = 13.sp)
+                            Text("The apps themselves are rendered by Android, not captured or embedded inside this APK. Window controls send real shell task commands. If firmware refuses freeform, apps open normally and Android Recents remains available.", color = DexMuted, fontSize = 13.sp)
                         }
                     }
                     1 -> ShizukuSetupCard()
-                    2 -> AccessibilitySetupCard(vm)
+                    2 -> {
+                        AccessibilitySetupCard(vm)
+                        OverlaySetupCard(vm)
+                    }
                     3 -> {
                         DexCard(Modifier.fillMaxWidth()) {
                             SectionTitle("Your choices are saved", "Setup will not interrupt every launch. Recheck live status any time in Desktop settings.")
                             StatusLine("Shizuku: ${shizuku.label}", shizuku.authorized, if (shizuku.authorized) "Advanced features connect on demand." else "Optional skipped or not yet connected. Normal desktop tools remain available.")
                             StatusLine("Accessibility: ${if (accessibility.bound) "enabled and bound" else "not enabled"}", accessibility.bound, "Optional foreground detection and navigation.")
-                            StatusLine("Overlay permission: not required", true, "The optional navigation pill uses the Accessibility Service's own overlay, not SYSTEM_ALERT_WINDOW.")
+                            StatusLine("Persistent dock: ${if (com.shrey.androiddex.standalone.system.DesktopDockController.state.value.running) "visible" else "optional / off"}",
+                                com.shrey.androiddex.standalone.system.DesktopDockController.state.value.running,
+                                "Display over other apps is checked live. It draws dock controls and window bars only; it never captures app video.")
                             Text("After a reboot, Shizuku must be started again using Wireless debugging. This app will detect that it stopped and never display a false connected state.", color = DexWarning, fontSize = 13.sp)
                         }
                         DexCard(Modifier.fillMaxWidth()) {

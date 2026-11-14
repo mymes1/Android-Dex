@@ -49,4 +49,32 @@ class CoreLogicTest {
         assertFalse(Capabilities(freeformSetting = "1", taskApi = false, shellUid = 2000).canOfferFreeform)
         assertTrue(Capabilities(freeformSetting = "1", taskApi = true, shellUid = 2000).canOfferFreeform)
     }
+    @Test fun nativeBoundsParsingRejectsEmptyOrShortArrays() {
+        assertNull(PixelBounds.fromArray(null))
+        assertNull(PixelBounds.fromArray(intArrayOf(1, 2, 3)))
+        assertNull(PixelBounds.fromArray(intArrayOf(10, 10, 10, 20)))
+        assertEquals(PixelBounds(10, 20, 310, 260), PixelBounds.fromArray(intArrayOf(10, 20, 310, 260)))
+    }
+    @Test fun nativeWindowMoveCannotLeaveDisplay() {
+        val bounds = PixelBounds(100, 100, 500, 400)
+        assertEquals(PixelBounds(0, 0, 400, 300), bounds.moved(-1000, -1000, 1280, 800))
+        assertEquals(PixelBounds(880, 500, 1280, 800), bounds.moved(5000, 5000, 1280, 800))
+    }
+    @Test fun nativeWindowResizeHonorsMinimumAndDisplayEdge() {
+        val bounds = PixelBounds(100, 100, 500, 400)
+        val shrunk = bounds.resized(-1000, -1000, 1280, 800)
+        assertEquals(320, shrunk.width)
+        assertEquals(240, shrunk.height)
+        val grown = bounds.resized(5000, 5000, 1280, 800)
+        assertEquals(1280, grown.right)
+        assertEquals(800, grown.bottom)
+    }
+    @Test fun nativeCascadeLeavesRoomForDock() {
+        val bounds = PixelBounds.cascade(1920, 1200, 2f, 4)
+        assertTrue(bounds.left >= 48)
+        assertTrue(bounds.top >= 48)
+        assertTrue(bounds.bottom <= 1200 - 168)
+        assertTrue(bounds.width >= 480)
+        assertTrue(bounds.height >= 360)
+    }
 }

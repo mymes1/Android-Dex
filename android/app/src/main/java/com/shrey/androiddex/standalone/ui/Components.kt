@@ -64,7 +64,7 @@ fun SettingSwitch(title: String, description: String, checked: Boolean, enabled:
             Text(title, style = MaterialTheme.typography.bodyMedium)
             Text(description, style = MaterialTheme.typography.bodySmall, color = DexMuted)
         }
-        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled, modifier = Modifier.semantics { contentDescription = title })
     }
 }
 

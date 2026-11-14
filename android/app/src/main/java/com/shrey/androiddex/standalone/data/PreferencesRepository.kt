@@ -29,6 +29,10 @@ class PreferencesRepository(context: Context, val displayId: Int) {
     var landscape: Boolean
         get() = global.getBoolean("landscape", true)
         set(value) { global.edit().putBoolean("landscape", value).apply() }
+    /** User-opted persistent dock. Never enabled silently; SYSTEM_ALERT_WINDOW is still checked live. */
+    var overlayDock: Boolean
+        get() = global.getBoolean("overlay_dock", false)
+        set(value) { global.edit().putBoolean("overlay_dock", value).apply() }
 
     fun pinnedPackages(): Set<String> = global.getStringSet("pinned_packages", emptySet())!!.toSet()
     fun setPinned(packages: Set<String>) { global.edit().putStringSet("pinned_packages", packages).apply() }

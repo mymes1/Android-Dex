@@ -20,18 +20,25 @@ import com.shrey.androiddex.standalone.ui.DexTheme
 import com.shrey.androiddex.standalone.ui.OnboardingScreen
 
 class MainActivity : ComponentActivity() {
+    companion object { const val EXTRA_OPEN_SETTINGS = "open_desktop_settings" }
     private lateinit var viewModel: DesktopViewModel
-
+    private var displayId = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val displayId = display?.displayId ?: 0
+        displayId = display?.displayId ?: 0
         viewModel = ViewModelProvider(this, DesktopViewModel.Factory(application, displayId))[DesktopViewModel::class.java]
         setContent {
             val preferences by viewModel.settings.collectAsStateWithLifecycle()
             var desktop by remember { mutableStateOf(PreferencesRepository(this, displayId).onboarded) }
 
+            LaunchedEffect(desktop) {
+                if (desktop && intent.getBooleanExtra(EXTRA_OPEN_SETTINGS, false)) {
+                    intent.removeExtra(EXTRA_OPEN_SETTINGS)
+                    viewModel.openTool(com.shrey.androiddex.standalone.data.WindowKind.SETTINGS)
+                }
+            }
             LaunchedEffect(desktop, preferences.immersive, preferences.landscape, preferences.keepScreenOn) {
                 requestedOrientation = if (desktop && preferences.landscape) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                 val controller = WindowInsetsControllerCompat(window, window.decorView)
@@ -55,6 +62,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         ShizukuManager.refresh()
         DesktopAccessibilityService.refreshEnabled(this)
+        com.shrey.androiddex.standalone.system.DesktopDockController.sync(this, displayId)
+        com.shrey.androiddex.standalone.system.DesktopMediaService.refreshAccess(this)
     }
     override fun onPause() {
         viewModel.persist()

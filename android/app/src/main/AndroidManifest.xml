@@ -2,7 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REORDER_TASKS" />
-    <!-- No INTERNET, storage, overlay, notification-content or root permissions. -->
+    <!-- Opt-in persistent dock over real Android windows. No video capture, INTERNET, storage or root. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -42,6 +46,23 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/desktop_accessibility" />
+        </service>
+        <service
+            android:name=".system.DesktopDockService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-enabled persistent desktop dock and window controls drawn over native Android app windows." />
+        </service>
+        <service
+            android:name=".system.DesktopMediaService"
+            android:exported="true"
+            android:label="@string/media_listener_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
         </service>
         <provider
             android:name="rikka.shizuku.ShizukuProvider"

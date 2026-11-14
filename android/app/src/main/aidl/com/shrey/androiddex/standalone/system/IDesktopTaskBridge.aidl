@@ -12,4 +12,11 @@ interface IDesktopTaskBridge {
     String launchDesktop(String component, int displayId) = 7;
     boolean removeTask(int taskId) = 8;
     void showRecents() = 9;
+    // Native freeform window management. All calls require shell UID 2000 and a live task token.
+    int[] taskBounds(int taskId) = 10;
+    String setTaskWindowingMode(int taskId, int windowingMode) = 11;
+    boolean setTaskHidden(int taskId, boolean hidden) = 12;
+    String resizeTask(int taskId, int left, int top, int right, int bottom) = 13;
+    String launchFreeformBounds(String component, int displayId, int left, int top, int right, int bottom) = 14;
+    void back() = 15;
 }

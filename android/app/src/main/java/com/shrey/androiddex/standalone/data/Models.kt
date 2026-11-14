@@ -101,6 +101,68 @@ data class NativeTask(
     val focused: Boolean,
     val resizable: Boolean,
     val windowingMode: Int
+) {
+    val freeform: Boolean get() = windowingMode == 5
+}
+
+/** Real Android task bounds in display pixels. Empty until the shell reports them. */
+data class PixelBounds(val left: Int, val top: Int, val right: Int, val bottom: Int) {
+    val width: Int get() = (right - left).coerceAtLeast(0)
+    val height: Int get() = (bottom - top).coerceAtLeast(0)
+    val isEmpty: Boolean get() = width <= 0 || height <= 0
+
+    fun moved(dx: Int, dy: Int, screenWidth: Int, screenHeight: Int): PixelBounds {
+        val maxLeft = (screenWidth - width).coerceAtLeast(0)
+        val maxTop = (screenHeight - height).coerceAtLeast(0)
+        val x = (left + dx).coerceIn(0, maxLeft)
+        val y = (top + dy).coerceIn(0, maxTop)
+        return PixelBounds(x, y, x + width, y + height)
+    }
+
+    fun resized(dw: Int, dh: Int, screenWidth: Int, screenHeight: Int, minWidth: Int = 320, minHeight: Int = 240): PixelBounds {
+        val maxW = (screenWidth - left).coerceAtLeast(minWidth)
+        val maxH = (screenHeight - top).coerceAtLeast(minHeight)
+        val w = (width + dw).coerceIn(minOf(minWidth, maxW), maxW)
+        val h = (height + dh).coerceIn(minOf(minHeight, maxH), maxH)
+        return PixelBounds(left, top, left + w, top + h)
+    }
+
+    companion object {
+        fun fromArray(values: IntArray?): PixelBounds? {
+            if (values == null || values.size < 4) return null
+            val bounds = PixelBounds(values[0], values[1], values[2], values[3])
+            return bounds.takeUnless { it.isEmpty }
+        }
+
+        /** Cascade a new native window inside the workspace, leaving room for the persistent dock. */
+        fun cascade(screenWidth: Int, screenHeight: Int, density: Float, index: Int, dockDp: Int = 84): PixelBounds {
+            val margin = (24 * density).toInt().coerceAtLeast(12)
+            val dock = (dockDp * density).toInt()
+            val usableW = (screenWidth - margin * 2).coerceAtLeast(320)
+            val usableH = (screenHeight - dock - margin * 2).coerceAtLeast(240)
+            val w = (usableW * 0.62f).toInt().coerceIn(minOf(480, usableW), usableW)
+            val h = (usableH * 0.72f).toInt().coerceIn(minOf(360, usableH), usableH)
+            val step = (28 * density).toInt()
+            val slackX = (usableW - w).coerceAtLeast(0)
+            val slackY = (usableH - h).coerceAtLeast(0)
+            val x = margin + ((index % 5) * step).coerceAtMost(slackX)
+            val y = margin + ((index % 5) * step).coerceAtMost(slackY)
+            return PixelBounds(x, y, x + w, y + h)
+        }
+    }
+}
+
+data class DockState(val desired: Boolean = false, val permission: Boolean = false, val running: Boolean = false, val displayId: Int = 0, val message: String = "")
+
+data class MediaSnapshot(
+    val accessGranted: Boolean = false,
+    val notificationCount: Int = 0,
+    val hasSession: Boolean = false,
+    val title: String = "",
+    val artist: String = "",
+    val playing: Boolean = false,
+    val packageName: String = "",
+    val artwork: androidx.compose.ui.graphics.ImageBitmap? = null
 )
 
 data class Capabilities(

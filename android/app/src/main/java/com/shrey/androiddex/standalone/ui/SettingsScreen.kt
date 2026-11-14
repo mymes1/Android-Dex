@@ -10,8 +10,10 @@ import android.view.Display
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -45,7 +47,7 @@ val wallpaperGradients = listOf(
     listOf(Color(0xFF0B201D), Color(0xFF245143), Color(0xFF0B1112)),
     listOf(Color(0xFF21172D), Color(0xFF45344E), Color(0xFF101218))
 )
-val wallpaperNames = listOf("Graphite", "Ocean", "Forest", "Dusk")
+val wallpaperNames = listOf("Android DeX", "Ocean", "Forest", "Dusk")
 
 @Composable
 fun WirelessInstructions(compact: Boolean = false) {
@@ -113,6 +115,57 @@ fun AccessibilitySetupCard(vm: DesktopViewModel) {
 }
 
 @Composable
+fun OverlaySetupCard(vm: DesktopViewModel) {
+    val context = LocalContext.current
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val dock by com.shrey.androiddex.standalone.system.DesktopDockController.state.collectAsStateWithLifecycle()
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        com.shrey.androiddex.standalone.system.DesktopDockController.sync(context, vm.displayId)
+    }
+    DexCard(Modifier.fillMaxWidth()) {
+        SectionTitle("Display over other apps · persistent dock", "Keeps the original-style dock and dark window bars above real Android apps.")
+        StatusLine(if (dock.running) "Dock visible" else if (settings.overlayDock && !dock.permission) "Waiting for overlay permission" else "Dock off", dock.running,
+            dock.message.ifBlank { "Touches between dock islands pass through to the app underneath. This does not capture app video." })
+        SettingSwitch("Persistent desktop dock", "Opt-in. Shows navigation, apps, media, battery, clock and native window controls over other apps.", settings.overlayDock) { enabled ->
+            vm.setOverlayDock(enabled)
+            if (enabled) {
+                if (!com.shrey.androiddex.standalone.system.DesktopDockController.hasPermission(context)) {
+                    com.shrey.androiddex.standalone.system.SystemActions.overlayPermission(context)
+                } else {
+                    if (Build.VERSION.SDK_INT >= 33 && androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    com.shrey.androiddex.standalone.system.DesktopDockController.sync(context, vm.displayId)
+                }
+            } else com.shrey.androiddex.standalone.system.DesktopDockController.disable(context)
+        }
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!dock.permission) ActionButton("Allow display over other apps", Icons.Default.Layers) {
+                com.shrey.androiddex.standalone.system.SystemActions.overlayPermission(context)
+            }
+            if (dock.running) TextButton(onClick = { vm.setOverlayDock(false); com.shrey.androiddex.standalone.system.DesktopDockController.disable(context) }) { Text("Hide dock") }
+        }
+        Text("Android may hide overlays on the lock screen. Revoking Display over other apps stops the dock immediately.", color = DexMuted, fontSize = 12.sp)
+    }
+}
+
+@Composable
+fun MediaSetupCard() {
+    val context = LocalContext.current
+    val media by com.shrey.androiddex.standalone.system.DesktopMediaService.state.collectAsStateWithLifecycle()
+    LaunchedEffect(context) { com.shrey.androiddex.standalone.system.DesktopMediaService.refreshAccess(context) }
+    DexCard(Modifier.fillMaxWidth()) {
+        SectionTitle("Media widget & notification badge", "Optional notification access powers the original-style now-playing island and unread count.")
+        StatusLine(if (media.accessGranted) "Notification access enabled" else "Notification access off", media.accessGranted,
+            "Only media title/artist/artwork/playback state and a notification count are used. Notification bodies, messages and typed text are not read or stored.")
+        ActionButton("Open notification access", Icons.Default.MusicNote) {
+            com.shrey.androiddex.standalone.system.SystemActions.notificationAccess(context)
+        }
+        Text("Find “DeX media and notification badge” and allow it. You can revoke this at any time in Android Settings.", color = DexMuted, fontSize = 12.sp)
+    }
+}
+
+@Composable
 fun WallpaperSettings(vm: DesktopViewModel) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(vm::importWallpaper) }
@@ -124,6 +177,7 @@ fun WallpaperSettings(vm: DesktopViewModel) {
                     Box(Modifier.size(76.dp, 48.dp).background(Brush.linearGradient(colors), RoundedCornerShape(9.dp))
                         .border(if (settings.wallpaper == index) 2.dp else 1.dp, if (settings.wallpaper == index) DexMint else DexBorder, RoundedCornerShape(9.dp))
                         .semantics { contentDescription = "Wallpaper ${wallpaperNames[index]}" }) {
+                        if (index == 0) Image(androidx.compose.ui.res.painterResource(com.shrey.androiddex.standalone.R.drawable.dex_wallpaper), null, Modifier.fillMaxSize().clip(RoundedCornerShape(9.dp)), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
                         IconButton(onClick = { vm.setWallpaper(index) }, modifier = Modifier.fillMaxSize()) {
                             if (settings.wallpaper == index) Icon(Icons.Default.Check, "Selected", tint = Color.White)
                         }
@@ -175,9 +229,9 @@ fun DeviceSettings(vm: DesktopViewModel, status: SystemStatus) {
             TextButton(onClick = { ShizukuManager.refresh(); vm.probeCapabilities() }) { Text("Probe capabilities") }
             TextButton(onClick = { SystemActions.display(context) }) { Text("Android display settings") }
         }
-        Text("Native freeform windows are system-owned, not embedded DeX windows. Split-screen and Recents remain Android features. Fixed-size apps and Samsung firmware may override launch requests.", color = DexMuted, fontSize = 12.sp)
+        Text("With freeform enabled, apps open in real Android windows. The optional overlay dock draws dark title bars and sends drag/resize/minimize/maximize/close commands through Shizuku. Apps are not embedded or re-rendered; fixed-size apps and Samsung firmware may override requests.", color = DexMuted, fontSize = 12.sp)
         if (shizuku.bridgeReady) {
-            ActionButton("Enable experimental system freeform", Icons.Default.Window, caps.taskApi) { consent = true }
+            ActionButton("Enable native app windows", Icons.Default.Window, caps.taskApi) { consent = true }
             if (caps.freeformSetting == "1" || caps.forceResizableSetting == "1") TextButton(onClick = { vm.setFreeform(false, false) }) { Text("Restore both development overrides to 0") }
         }
     }
@@ -200,7 +254,7 @@ fun DeviceSettings(vm: DesktopViewModel, status: SystemStatus) {
     }
     if (consent) AlertDialog(onDismissRequest = { consent = false }, title = { Text("Change Android development settings?") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("With your authorization, Shizuku will set global enable_freeform_support=1. This is experimental and may be ignored or behave poorly on Samsung firmware.")
+            Text("With your authorization, Shizuku will set global enable_freeform_support=1 so apps can open in real Android windows. This is experimental and may be ignored or behave poorly on Samsung firmware. Enable the persistent dock separately to show dark window bars and controls.")
             SettingSwitch("Also force activities to resize", "Sets force_resizable_activities=1. Some apps may render incorrectly.", forceResizable, onChange = { forceResizable = it })
             Text("No resolution or density is changed. Restart affected apps; a reboot may be needed. You can restore both keys to 0 here.", color = DexMuted, fontSize = 12.sp)
         } },
@@ -225,6 +279,8 @@ fun SettingsScreen(vm: DesktopViewModel, status: SystemStatus, deviceOnly: Boole
         else {
             ShizukuSetupCard()
             AccessibilitySetupCard(vm)
+            OverlaySetupCard(vm)
+            MediaSetupCard()
             WallpaperSettings(vm)
             DexCard(Modifier.fillMaxWidth()) {
                 SectionTitle("Desktop behavior")
@@ -240,8 +296,8 @@ fun SettingsScreen(vm: DesktopViewModel, status: SystemStatus, deviceOnly: Boole
             DeviceSettings(vm, status)
         }
         DexCard(Modifier.fillMaxWidth()) {
-            SectionTitle("Privacy & local data", "No INTERNET permission, analytics, remote desktop, PC connection or root.")
-            Text("Pinned apps, recent launch names, notes, layout and your selected wallpaper are stored only on this tablet. Accessibility does not retain window text or input. Shizuku is a separate app with its own privacy policy.", color = DexMuted, fontSize = 12.sp)
+            SectionTitle("Privacy & local data", "No INTERNET permission, analytics, remote desktop, PC connection, screen capture or root.")
+            Text("Pinned apps, recent launch names, notes, layout and your selected wallpaper are stored only on this tablet. Accessibility does not retain window text or input. Optional notification access uses only media metadata and a count, never notification bodies. Display over other apps draws controls only; it does not capture other apps' video. Shizuku is a separate app with its own privacy policy.", color = DexMuted, fontSize = 12.sp)
             Row(Modifier.horizontalScroll(rememberScrollState())) {
                 TextButton(onClick = { vm.clearRecents(); vm.notify("Local recent-launch history cleared.") }) { Text("Clear recent launches") }
                 TextButton(onClick = {

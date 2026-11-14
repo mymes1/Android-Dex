@@ -22,6 +22,19 @@ object SystemActions {
     }
 
     fun accessibility(context: Context): Boolean = open(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+    fun overlayPermission(context: Context): Boolean =
+        open(context, Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))) ||
+            open(context, Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
+    fun notificationAccess(context: Context): Boolean = open(context, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+    fun webSearch(context: Context, query: String, perplexity: Boolean = false): Boolean {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return if (perplexity) url(context, "https://www.perplexity.ai/") else url(context, "https://www.google.com/")
+        val encoded = Uri.encode(trimmed)
+        val address = if (perplexity) "https://www.perplexity.ai/search?q=$encoded" else "https://www.google.com/search?q=$encoded"
+        return open(context, Intent(Intent.ACTION_VIEW, Uri.parse(address))) ||
+            open(context, Intent(Intent.ACTION_WEB_SEARCH).putExtra(android.app.SearchManager.QUERY, trimmed))
+    }
+    fun voiceSearch(context: Context): Boolean = open(context, Intent(android.speech.RecognizerIntent.ACTION_WEB_SEARCH))
     fun developerOptions(context: Context): Boolean = open(context, Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) ||
         open(context, Intent(Settings.ACTION_SETTINGS))
     fun deviceInfo(context: Context): Boolean = open(context, Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)) ||
@@ -42,6 +55,14 @@ object SystemActions {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         if (displayId != null && displayId != 0) intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
         val options = displayId?.let { android.app.ActivityOptions.makeBasic().setLaunchDisplayId(it).toBundle() }
+        return runCatching { context.startActivity(intent, options); true }.getOrDefault(false)
+    }
+    fun desktopSettings(context: Context, displayId: Int = 0): Boolean {
+        val intent = Intent(context, com.shrey.androiddex.standalone.MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            .putExtra(com.shrey.androiddex.standalone.MainActivity.EXTRA_OPEN_SETTINGS, true)
+        if (displayId != 0) intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+        val options = if (displayId != 0) android.app.ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle() else null
         return runCatching { context.startActivity(intent, options); true }.getOrDefault(false)
     }
 }

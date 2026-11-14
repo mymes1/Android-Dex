@@ -213,6 +213,8 @@ fun CalculatorContent() {
 @Composable
 fun TasksContent(vm: DesktopViewModel) {
     val tasks by vm.tasks.collectAsStateWithLifecycle()
+    val hidden by vm.hiddenNativeTasks.collectAsStateWithLifecycle()
+    val maximized by vm.maximizedNativeTasks.collectAsStateWithLifecycle()
     val known by vm.tasksKnown.collectAsStateWithLifecycle()
     val error by vm.taskError.collectAsStateWithLifecycle()
     val shizuku by ShizukuManager.state.collectAsStateWithLifecycle()
@@ -239,9 +241,14 @@ fun TasksContent(vm: DesktopViewModel) {
                         AppIcon(vm.appsRepository, task.packageName, 36.dp)
                         Column(Modifier.weight(1f)) {
                             Text(vm.appLabel(task.packageName), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("Task ${task.id} · ${if (task.focused) "focused" else if (task.visible) "visible" else "running"} · ${if (task.windowingMode == 5) "freeform" else "system window"}", color = DexMuted, fontSize = 10.sp)
+                            Text("Task ${task.id} · ${if (task.id in hidden) "minimized" else if (task.focused) "focused" else if (task.visible) "visible" else "running"} · ${if (task.windowingMode == 5) "freeform" else if (task.windowingMode == 1) "fullscreen" else "system window"}", color = DexMuted, fontSize = 10.sp)
                         }
-                        IconButton(onClick = { vm.switchTask(task) }) { Icon(Icons.Default.OpenInNew, "Switch to ${vm.appLabel(task.packageName)}") }
+                        if (task.id in hidden) IconButton(onClick = { vm.restoreNativeTask(task.id) }) { Icon(Icons.Default.Restore, "Restore Android window") }
+                        else if (task.freeform) {
+                            IconButton(onClick = { vm.minimizeNativeTask(task.id) }) { Icon(Icons.Default.Minimize, "Minimize Android window") }
+                            IconButton(onClick = { vm.toggleNativeMaximize(task.id) }) { Icon(if (task.id in maximized) Icons.Default.FilterNone else Icons.Default.CropSquare, if (task.id in maximized) "Restore Android window size" else "Maximize Android window") }
+                        }
+                        IconButton(onClick = { if (task.id in hidden) vm.restoreNativeTask(task.id) else vm.switchTask(task) }) { Icon(Icons.Default.OpenInNew, "Switch to ${vm.appLabel(task.packageName)}") }
                         IconButton(enabled = task.packageName != context.packageName, onClick = { close = task }) { Icon(Icons.Default.Close, "Close Android task") }
                     }
                 }

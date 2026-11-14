@@ -3,15 +3,18 @@ package com.shrey.androiddex.standalone.ui
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.shrey.androiddex.standalone.data.*
+import com.shrey.androiddex.standalone.system.DesktopAccessibilityService
 import com.shrey.androiddex.standalone.system.ShizukuManager
 import com.shrey.androiddex.standalone.system.SystemActions
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +23,8 @@ import kotlinx.coroutines.launch
 
 data class DesktopPreferences(
     val wallpaper: Int = 0, val wallpaperRevision: Int = 0, val floatingNavigation: Boolean = false,
-    val immersive: Boolean = true, val keepScreenOn: Boolean = false, val landscape: Boolean = true
+    val immersive: Boolean = true, val keepScreenOn: Boolean = false, val landscape: Boolean = true,
+    val overlayDock: Boolean = false
 )
 
 class DesktopViewModel(private val application: Application, val displayId: Int) : ViewModel() {
@@ -46,6 +50,14 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     val tasks = _tasks.asStateFlow()
     private val _tasksKnown = MutableStateFlow(false)
     val tasksKnown = _tasksKnown.asStateFlow()
+    private val _nativeBounds = MutableStateFlow<Map<Int, PixelBounds>>(emptyMap())
+    val nativeBounds = _nativeBounds.asStateFlow()
+    private val _hiddenNativeTasks = MutableStateFlow<Set<Int>>(emptySet())
+    val hiddenNativeTasks = _hiddenNativeTasks.asStateFlow()
+    private val _maximizedNativeTasks = MutableStateFlow<Set<Int>>(emptySet())
+    val maximizedNativeTasks = _maximizedNativeTasks.asStateFlow()
+    private val restoreBounds = mutableMapOf<Int, PixelBounds>()
+    private var resizeJob: Job? = null
     private val _taskError = MutableStateFlow("Connect and authorize Shizuku to list real Android tasks.")
     val taskError = _taskError.asStateFlow()
     private val _capabilities = MutableStateFlow(Capabilities(
@@ -56,12 +68,16 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     val messages = _messages.receiveAsFlow()
     private var appJob: Job? = null
     private var taskJob: Job? = null
+    private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> _settings.value = readSettings() }
 
-    init { refreshApps() }
+    init {
+        application.getSharedPreferences("dex_preferences", Context.MODE_PRIVATE).registerOnSharedPreferenceChangeListener(preferenceListener)
+        refreshApps()
+    }
 
     fun notify(message: String) { _messages.trySend(message) }
     private fun readSettings() = DesktopPreferences(preferences.wallpaper, preferences.wallpaperRevision, preferences.floatingNavigation,
-        preferences.immersive, preferences.keepScreenOn, preferences.landscape)
+        preferences.immersive, preferences.keepScreenOn, preferences.landscape, preferences.overlayDock)
     private fun updateSettings(block: () -> Unit) { block(); preferencesChanged(); _settings.value = readSettings() }
     private fun preferencesChanged() {
         // Preference changes also notify the Accessibility Service; increment is not used as a permission signal.
@@ -158,6 +174,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     fun setImmersive(value: Boolean) { updateSettings { preferences.immersive = value } }
     fun setKeepScreenOn(value: Boolean) { updateSettings { preferences.keepScreenOn = value } }
     fun setLandscape(value: Boolean) { updateSettings { preferences.landscape = value } }
+    fun setOverlayDock(value: Boolean) { updateSettings { preferences.overlayDock = value } }
     fun togglePin(packageName: String) { _pins.value = preferences.togglePinned(packageName) }
     fun clearRecents() { preferences.clearRecents(); _recents.value = emptyList() }
     fun reviewSetup() { preferences.onboarded = false }
@@ -172,12 +189,20 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
             _appsLoading.value = false
         }
     }
-    fun launchApp(entry: AppEntry, freeform: Boolean = false) {
-        if (freeform) {
+    /** null = prefer a real native window when the live capability probe allows it; false = fullscreen. */
+    fun launchApp(entry: AppEntry, freeform: Boolean? = null) {
+        val useFreeform = freeform ?: (_capabilities.value.canOfferFreeform && ShizukuManager.state.value.bridgeReady)
+        if (useFreeform) {
             if (!_capabilities.value.canOfferFreeform || !ShizukuManager.state.value.bridgeReady) { notify("Native freeform is not available. Open the app normally instead."); return }
+            val metrics = nativeDisplayMetrics()
+            val bounds = PixelBounds.cascade(metrics.widthPixels, metrics.heightPixels, metrics.density, _tasks.value.size)
             viewModelScope.launch {
-                runCatching { ShizukuManager.launchFreeform(entry, displayId) }
-                    .onSuccess { preferences.recordLaunch(entry.packageName); _recents.value = preferences.recentApps(); notify(it) }
+                runCatching { ShizukuManager.launchFreeform(entry, displayId, bounds) }
+                    .onSuccess {
+                        preferences.recordLaunch(entry.packageName); _recents.value = preferences.recentApps()
+                        notify("${entry.label} opened in an Android window. Firmware may still override the mode.")
+                        delay(600); refreshTasks()
+                    }
                     .onFailure { notify(it.message ?: "Android refused the freeform launch") }
             }
             return
@@ -188,9 +213,14 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
         runCatching { application.startActivity(intent, options) }
             .onSuccess {
                 preferences.recordLaunch(entry.packageName); _recents.value = preferences.recentApps()
-                notify("${entry.label} opened in Android. Use Recents or the optional DeX navigation pill to return.")
+                notify("${entry.label} opened in Android. Use Recents or the DeX dock to return.")
             }
             .onFailure { notify("Android could not open ${entry.label}. The shortcut may have changed.") }
+    }
+
+    private fun nativeDisplayMetrics(): android.util.DisplayMetrics {
+        val display = application.getSystemService(android.hardware.display.DisplayManager::class.java).getDisplay(displayId)
+        return (display?.let { application.createDisplayContext(it) } ?: application).resources.displayMetrics
     }
     fun refreshTasks() {
         taskJob?.cancel()
@@ -201,8 +231,20 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                 return@launch
             }
             runCatching { ShizukuManager.tasks(displayId) }
-                .onSuccess { _tasks.value = it.filter { task -> task.running }; _tasksKnown.value = true; _taskError.value = "" }
-                .onFailure { _tasks.value = emptyList(); _tasksKnown.value = false; _taskError.value = it.message ?: "Task listing is unsupported on this firmware." }
+                .onSuccess { list ->
+                    val running = list.filter { task -> task.running }
+                    _tasks.value = running; _tasksKnown.value = true; _taskError.value = ""
+                    val ids = running.map { it.id }.toSet()
+                    _hiddenNativeTasks.value = _hiddenNativeTasks.value.intersect(ids)
+                    _maximizedNativeTasks.value = _maximizedNativeTasks.value.intersect(ids)
+                    restoreBounds.keys.retainAll(ids)
+                    val bounds = _nativeBounds.value.filterKeys { it in ids }.toMutableMap()
+                    running.filter { it.freeform && it.visible && it.id !in _hiddenNativeTasks.value }.take(12).forEach { task ->
+                        ShizukuManager.taskBounds(task.id)?.let { bounds[task.id] = it }
+                    }
+                    _nativeBounds.value = bounds
+                }
+                .onFailure { _tasks.value = emptyList(); _tasksKnown.value = false; _nativeBounds.value = emptyMap(); _taskError.value = it.message ?: "Task listing is unsupported on this firmware." }
         }
     }
     fun probeCapabilities() {
@@ -235,6 +277,80 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
             .onSuccess { refreshTasks(); notify("Android task closed.") }
             .onFailure { notify(it.message ?: "Could not close task") } }
     }
+
+    fun minimizeNativeTask(taskId: Int) {
+        viewModelScope.launch {
+            runCatching { ShizukuManager.setTaskHidden(taskId, true) }
+                .onSuccess { _hiddenNativeTasks.value = _hiddenNativeTasks.value + taskId; refreshTasks() }
+                .onFailure { notify(it.message ?: "Android refused to minimize this window") }
+        }
+    }
+    fun restoreNativeTask(taskId: Int) {
+        val task = _tasks.value.firstOrNull { it.id == taskId } ?: return
+        viewModelScope.launch {
+            runCatching {
+                ShizukuManager.setTaskHidden(taskId, false)
+                if (taskId in _maximizedNativeTasks.value) {
+                    ShizukuManager.setTaskWindowingMode(taskId, 5)
+                    restoreBounds[taskId]?.let { ShizukuManager.resizeTask(taskId, it) }
+                }
+                ShizukuManager.bringToFront(task)
+            }.onSuccess {
+                _hiddenNativeTasks.value = _hiddenNativeTasks.value - taskId
+                _maximizedNativeTasks.value = _maximizedNativeTasks.value - taskId
+                refreshTasks()
+            }.onFailure { notify(it.message ?: "Android refused to restore this window") }
+        }
+    }
+    fun toggleNativeMaximize(taskId: Int) {
+        viewModelScope.launch {
+            runCatching {
+                if (taskId in _maximizedNativeTasks.value) {
+                    ShizukuManager.setTaskWindowingMode(taskId, 5)
+                    val bounds = restoreBounds[taskId] ?: _nativeBounds.value[taskId]
+                    if (bounds != null) ShizukuManager.resizeTask(taskId, bounds)
+                } else {
+                    val current = _nativeBounds.value[taskId] ?: ShizukuManager.taskBounds(taskId)
+                    if (current != null) restoreBounds[taskId] = current
+                    ShizukuManager.setTaskWindowingMode(taskId, 1)
+                }
+            }.onSuccess {
+                _maximizedNativeTasks.value = if (taskId in _maximizedNativeTasks.value) _maximizedNativeTasks.value - taskId else _maximizedNativeTasks.value + taskId
+                refreshTasks()
+            }.onFailure { notify(it.message ?: "Android refused the window mode change") }
+        }
+    }
+    fun closeNativeTask(taskId: Int) {
+        viewModelScope.launch {
+            runCatching { ShizukuManager.removeTask(NativeTask(taskId, displayId, "", "", true, false, false, false, 5)) }
+                .onSuccess { _hiddenNativeTasks.value = _hiddenNativeTasks.value - taskId; refreshTasks(); notify("Android window closed.") }
+                .onFailure { notify(it.message ?: "Could not close this Android window") }
+        }
+    }
+    fun previewNativeBounds(taskId: Int, bounds: PixelBounds) {
+        _nativeBounds.value = _nativeBounds.value + (taskId to bounds)
+    }
+    fun dragNativeTask(taskId: Int, bounds: PixelBounds) {
+        previewNativeBounds(taskId, bounds)
+        resizeJob?.cancel()
+        resizeJob = viewModelScope.launch {
+            delay(45)
+            runCatching { ShizukuManager.resizeTask(taskId, bounds) }.onFailure { notify(it.message ?: "Android refused the window resize") }
+        }
+    }
+    fun commitNativeBounds(taskId: Int, bounds: PixelBounds) {
+        resizeJob?.cancel()
+        previewNativeBounds(taskId, bounds)
+        viewModelScope.launch {
+            runCatching { ShizukuManager.resizeTask(taskId, bounds) }
+                .onSuccess { refreshTasks() }
+                .onFailure { notify(it.message ?: "Android refused the window resize"); refreshTasks() }
+        }
+    }
+    fun dockBack() {
+        if (DesktopAccessibilityService.navigate(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)) return
+        viewModelScope.launch { runCatching { ShizukuManager.back() }.onFailure { notify("Enable Accessibility navigation or authorize Shizuku for Back.") } }
+    }
     fun switchNextNativeTask(): Boolean {
         if (!_tasksKnown.value) return false
         val candidates = _tasks.value.filter { it.running && it.packageName != application.packageName }
@@ -248,7 +364,12 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
         viewModelScope.launch { runCatching { ShizukuManager.showRecents() }.onFailure { notify("Enable Accessibility navigation or authorize Shizuku to open Android Recents.") } }
     }
     fun appLabel(packageName: String): String = _apps.value.firstOrNull { it.packageName == packageName }?.label ?: packageName
-    override fun onCleared() { persist(); super.onCleared() }
+    override fun onCleared() {
+        application.getSharedPreferences("dex_preferences", Context.MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(preferenceListener)
+        resizeJob?.cancel()
+        persist()
+        super.onCleared()
+    }
 
     class Factory(private val application: Application, private val displayId: Int) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

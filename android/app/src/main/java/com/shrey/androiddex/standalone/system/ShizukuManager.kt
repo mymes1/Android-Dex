@@ -191,9 +191,24 @@ object ShizukuManager {
     suspend fun removeTask(task: NativeTask): Unit = withContext(Dispatchers.IO) {
         check(requireBridge().removeTask(task.id)) { "Android did not close this task" }
     }
-    suspend fun launchFreeform(entry: AppEntry, displayId: Int): String = withContext(Dispatchers.IO) {
-        requireBridge().launchFreeform(entry.component, displayId)
+    suspend fun launchFreeform(entry: AppEntry, displayId: Int, bounds: com.shrey.androiddex.standalone.data.PixelBounds? = null): String = withContext(Dispatchers.IO) {
+        val remote = requireBridge()
+        if (bounds == null) remote.launchFreeform(entry.component, displayId)
+        else remote.launchFreeformBounds(entry.component, displayId, bounds.left, bounds.top, bounds.right, bounds.bottom)
     }
+    suspend fun taskBounds(taskId: Int): com.shrey.androiddex.standalone.data.PixelBounds? = withContext(Dispatchers.IO) {
+        com.shrey.androiddex.standalone.data.PixelBounds.fromArray(runCatching { requireBridge().taskBounds(taskId) }.getOrNull())
+    }
+    suspend fun setTaskWindowingMode(taskId: Int, mode: Int): String = withContext(Dispatchers.IO) {
+        requireBridge().setTaskWindowingMode(taskId, mode)
+    }
+    suspend fun setTaskHidden(taskId: Int, hidden: Boolean): Unit = withContext(Dispatchers.IO) {
+        check(requireBridge().setTaskHidden(taskId, hidden)) { "Android did not accept the visibility change" }
+    }
+    suspend fun resizeTask(taskId: Int, bounds: com.shrey.androiddex.standalone.data.PixelBounds): String = withContext(Dispatchers.IO) {
+        requireBridge().resizeTask(taskId, bounds.left, bounds.top, bounds.right, bounds.bottom)
+    }
+    suspend fun back(): Unit = withContext(Dispatchers.IO) { requireBridge().back() }
     suspend fun launchDesktop(displayId: Int): String = withContext(Dispatchers.IO) {
         requireBridge().launchDesktop(ComponentName(appContext, com.shrey.androiddex.standalone.MainActivity::class.java).flattenToShortString(), displayId)
     }
