@@ -174,7 +174,9 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
             scope.launch { ShizukuManager.state.collect { if (it.bridgeReady) { vm.probeCapabilities(); vm.refreshTasks() } } },
             scope.launch { while (isActive) { if (screenOn && ShizukuManager.state.value.bridgeReady) vm.refreshTasks(); delay(1500) } },
             scope.launch { vm.tasks.collect { syncCaptions() } },
-            scope.launch { vm.nativeBounds.collect { syncCaptions() } }
+            scope.launch { vm.nativeBounds.collect { syncCaptions() } },
+            scope.launch { vm.maximizedNativeTasks.collect { syncCaptions(recreate = true) } },
+            scope.launch { vm.hiddenNativeTasks.collect { syncCaptions(recreate = true) } }
         )
     }
 
@@ -268,13 +270,15 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
         SystemActions.desktopSettings(this, currentDisplayId)
     }
 
-    private fun syncCaptions() {
+    private fun syncCaptions(recreate: Boolean = false) {
         if (windows == null || !::vm.isInitialized) return
         val hidden = vm.hiddenNativeTasks.value
         val boundsMap = vm.nativeBounds.value
         val maximized = vm.maximizedNativeTasks.value
         val wanted = vm.tasks.value.filter { (it.freeform || it.id in maximized) && it.visible && it.id !in hidden && boundsMap[it.id]?.isEmpty == false }.associateBy { it.id }
-        val remove = captions.keys - wanted.keys
+        // Mode/visibility changes recreate the small caption window so its controls are guaranteed
+        // to reflect the new state even if an overlay window does not invalidate composition promptly.
+        val remove = (captions.keys - wanted.keys) + if (recreate) captions.keys.intersect(wanted.keys) else emptySet()
         remove.forEach { id -> captions.remove(id)?.let { runCatching { windows!!.removeViewImmediate(it.view) } } }
         wanted.forEach { (id, task) ->
             val bounds = boundsMap[id] ?: return@forEach
