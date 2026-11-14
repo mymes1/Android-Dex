@@ -50,11 +50,11 @@ class DesktopFlowTest {
     @Test fun notesAreRealPersistentWindows() {
         enterDesktop()
         compose.onNodeWithText("Notes", substring = false).performClick()
-        compose.onNode(hasSetTextAction()).performTextInput("Hello from the tablet")
+        compose.onNodeWithContentDescription("Note editor").performTextInput("Hello from the tablet")
         compose.waitUntil(6000) { PreferencesRepository(context, 0).notes().any { it.text == "Hello from the tablet" } }
         compose.onNodeWithContentDescription("Close Notes", substring = true).performClick()
         compose.onNodeWithText("Notes", substring = false).performClick()
-        compose.onNode(hasSetTextAction()).assertTextContains("Hello from the tablet")
+        compose.onNodeWithContentDescription("Note editor").assertTextContains("Hello from the tablet")
     }
 
     @Test fun windowControlsAndTaskbarRestoreWork() {
@@ -72,8 +72,8 @@ class DesktopFlowTest {
     @Test fun startSearchAndKeyboardShortcutsWork() {
         enterDesktop()
         compose.onNodeWithContentDescription("Start menu").performClick()
-        compose.onNode(hasSetTextAction()).performTextInput("settings")
-        compose.onNode(hasSetTextAction()).assertTextContains("settings")
+        compose.onNodeWithContentDescription("Search applications").performTextInput("settings")
+        compose.onNodeWithContentDescription("Search applications").assertTextContains("settings")
         compose.onRoot().performKeyInput { pressKey(Key.Escape) }
         compose.onNodeWithText("Your applications").assertDoesNotExist()
         compose.onRoot().performKeyInput { pressKey(Key.MetaLeft) }

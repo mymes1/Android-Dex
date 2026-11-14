@@ -158,9 +158,11 @@ fun DockPanelContent(vm: DesktopViewModel, panel: DockPanel, status: SystemStatu
 @Composable
 private fun NativeTasksPanel(vm: DesktopViewModel, onDismiss: () -> Unit) {
     val tasks by vm.tasks.collectAsStateWithLifecycle()
+    val minimized by vm.minimizedNativeTasks.collectAsStateWithLifecycle()
     val hidden by vm.hiddenNativeTasks.collectAsStateWithLifecycle()
     val maximized by vm.maximizedNativeTasks.collectAsStateWithLifecycle()
     val shizuku by ShizukuManager.state.collectAsStateWithLifecycle()
+    val allTasks = remember(tasks, minimized) { tasks + minimized.values.filterNot { m -> tasks.any { it.id == m.id } } }
     Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Android windows", Modifier.weight(1f), fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
@@ -168,9 +170,9 @@ private fun NativeTasksPanel(vm: DesktopViewModel, onDismiss: () -> Unit) {
             IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Close tasks", Modifier.size(18.dp)) }
         }
         if (!shizuku.bridgeReady) Text("Authorize Shizuku to list and control real Android tasks.", color = DexMuted, fontSize = 12.sp)
-        else if (tasks.isEmpty()) Text("No running Android tasks were reported.", color = DexMuted, fontSize = 12.sp)
+        else if (allTasks.isEmpty()) Text("No running Android tasks were reported.", color = DexMuted, fontSize = 12.sp)
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(tasks, key = { it.id }) { task ->
+            items(allTasks, key = { it.id }) { task ->
                 Surface(color = Color(0x3320343B), shape = RoundedCornerShape(12.dp)) {
                     Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         AppIcon(vm.appsRepository, task.packageName, 32.dp)
@@ -180,7 +182,7 @@ private fun NativeTasksPanel(vm: DesktopViewModel, onDismiss: () -> Unit) {
                         }
                         if (task.id in hidden) TextButton(onClick = { vm.restoreNativeTask(task.id) }) { Text("Restore", fontSize = 11.sp) }
                         else TextButton(onClick = { vm.switchTask(task) }) { Text("Focus", fontSize = 11.sp) }
-                        if (task.freeform && task.id !in hidden) IconButton(onClick = { vm.toggleNativeMaximize(task.id) }, modifier = Modifier.size(32.dp)) {
+                        if ((task.freeform || task.id in maximized) && task.id !in hidden) IconButton(onClick = { vm.toggleNativeMaximize(task.id) }, modifier = Modifier.size(32.dp)) {
                             Icon(if (task.id in maximized) Icons.Default.FilterNone else Icons.Default.CropSquare, if (task.id in maximized) "Restore native window" else "Maximize native window", Modifier.size(16.dp))
                         }
                         IconButton(onClick = { vm.closeTask(task) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Close, "Close native window", Modifier.size(16.dp)) }

@@ -54,11 +54,13 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     val nativeBounds = _nativeBounds.asStateFlow()
     private val _hiddenNativeTasks = MutableStateFlow<Set<Int>>(emptySet())
     val hiddenNativeTasks = _hiddenNativeTasks.asStateFlow()
+    private val _minimizedNativeTasks = MutableStateFlow<Map<Int, NativeTask>>(emptyMap())
+    val minimizedNativeTasks = _minimizedNativeTasks.asStateFlow()
     private val _maximizedNativeTasks = MutableStateFlow<Set<Int>>(emptySet())
     val maximizedNativeTasks = _maximizedNativeTasks.asStateFlow()
     private val restoreBounds = mutableMapOf<Int, PixelBounds>()
-    private val nativeResizeRequests = Channel<Pair<Int, PixelBounds>>(Channel.CONFLATED)
-    private var resizeJob: Job? = null
+    private data class NativeResizeRequest(val taskId: Int, val bounds: PixelBounds, val commit: Boolean = false)
+    private val nativeResizeRequests = Channel<NativeResizeRequest>(Channel.CONFLATED)
     private val _taskError = MutableStateFlow("Connect and authorize Shizuku to list real Android tasks.")
     val taskError = _taskError.asStateFlow()
     private val _capabilities = MutableStateFlow(Capabilities(
@@ -74,8 +76,10 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     init {
         application.getSharedPreferences("dex_preferences", Context.MODE_PRIVATE).registerOnSharedPreferenceChangeListener(preferenceListener)
         viewModelScope.launch {
-            for ((taskId, bounds) in nativeResizeRequests) {
-                runCatching { ShizukuManager.resizeTask(taskId, bounds) }
+            for (request in nativeResizeRequests) {
+                runCatching { ShizukuManager.resizeTask(request.taskId, request.bounds) }
+                    .onFailure { if (request.commit) notify(it.message ?: "Android refused the window resize") }
+                if (request.commit) refreshTasks()
                 delay(30)
             }
         }
@@ -242,6 +246,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                     val running = list.filter { task -> task.running }
                     _tasks.value = running; _tasksKnown.value = true; _taskError.value = ""
                     val ids = running.map { it.id }.toSet()
+                    _minimizedNativeTasks.value = _minimizedNativeTasks.value.filterKeys { it in ids }
                     _hiddenNativeTasks.value = _hiddenNativeTasks.value.intersect(ids)
                     _maximizedNativeTasks.value = _maximizedNativeTasks.value.intersect(ids)
                     restoreBounds.keys.retainAll(ids)
@@ -288,12 +293,16 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     fun minimizeNativeTask(taskId: Int) {
         viewModelScope.launch {
             runCatching { ShizukuManager.setTaskHidden(taskId, true) }
-                .onSuccess { _hiddenNativeTasks.value = _hiddenNativeTasks.value + taskId; refreshTasks() }
+                .onSuccess {
+                    _tasks.value.firstOrNull { it.id == taskId }?.let { _minimizedNativeTasks.value = _minimizedNativeTasks.value + (taskId to it) }
+                    _hiddenNativeTasks.value = _hiddenNativeTasks.value + taskId
+                    refreshTasks()
+                }
                 .onFailure { notify(it.message ?: "Android refused to minimize this window") }
         }
     }
     fun restoreNativeTask(taskId: Int) {
-        val task = _tasks.value.firstOrNull { it.id == taskId } ?: return
+        val task = _tasks.value.firstOrNull { it.id == taskId } ?: _minimizedNativeTasks.value[taskId] ?: return
         viewModelScope.launch {
             runCatching {
                 ShizukuManager.setTaskHidden(taskId, false)
@@ -304,6 +313,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                 ShizukuManager.bringToFront(task)
             }.onSuccess {
                 _hiddenNativeTasks.value = _hiddenNativeTasks.value - taskId
+                _minimizedNativeTasks.value = _minimizedNativeTasks.value - taskId
                 _maximizedNativeTasks.value = _maximizedNativeTasks.value - taskId
                 refreshTasks()
             }.onFailure { notify(it.message ?: "Android refused to restore this window") }
@@ -330,7 +340,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     fun closeNativeTask(taskId: Int) {
         viewModelScope.launch {
             runCatching { ShizukuManager.removeTask(NativeTask(taskId, displayId, "", "", true, false, false, false, 5)) }
-                .onSuccess { _hiddenNativeTasks.value = _hiddenNativeTasks.value - taskId; refreshTasks(); notify("Android window closed.") }
+                .onSuccess { _hiddenNativeTasks.value = _hiddenNativeTasks.value - taskId; _minimizedNativeTasks.value = _minimizedNativeTasks.value - taskId; refreshTasks(); notify("Android window closed.") }
                 .onFailure { notify(it.message ?: "Could not close this Android window") }
         }
     }
@@ -339,16 +349,11 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     }
     fun dragNativeTask(taskId: Int, bounds: PixelBounds) {
         previewNativeBounds(taskId, bounds)
-        nativeResizeRequests.trySend(taskId to bounds)
+        nativeResizeRequests.trySend(NativeResizeRequest(taskId, bounds))
     }
     fun commitNativeBounds(taskId: Int, bounds: PixelBounds) {
-        resizeJob?.cancel()
         previewNativeBounds(taskId, bounds)
-        viewModelScope.launch {
-            runCatching { ShizukuManager.resizeTask(taskId, bounds) }
-                .onSuccess { refreshTasks() }
-                .onFailure { notify(it.message ?: "Android refused the window resize"); refreshTasks() }
-        }
+        nativeResizeRequests.trySend(NativeResizeRequest(taskId, bounds, commit = true))
     }
     fun dockBack() {
         if (DesktopAccessibilityService.navigate(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)) return
@@ -369,7 +374,6 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     fun appLabel(packageName: String): String = _apps.value.firstOrNull { it.packageName == packageName }?.label ?: packageName
     override fun onCleared() {
         application.getSharedPreferences("dex_preferences", Context.MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(preferenceListener)
-        resizeJob?.cancel()
         nativeResizeRequests.close()
         persist()
         super.onCleared()

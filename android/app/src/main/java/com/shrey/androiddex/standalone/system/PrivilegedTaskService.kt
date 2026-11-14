@@ -106,7 +106,8 @@ class PrivilegedTaskService : IDesktopTaskBridge.Stub {
         requireShell()
         validateComponent(component)
         if (displayId < 0) throw RemoteException("Invalid display")
-        val output = command(listOf("am", "start", "-W", "--windowingMode", "5", "--displayId", displayId.toString(), "-n", component))
+        // AOSP ActivityManagerShellCommand spells this option --display (not --displayId).
+        val output = command(listOf("am", "start", "-W", "--windowingMode", "5", "--display", displayId.toString(), "-n", component))
         if (output.contains("Error:", true) || output.contains("Exception", true) || output.contains("does not exist", true))
             throw RemoteException(output.take(400))
         return "Android accepted the launch. The firmware may still choose fullscreen."
@@ -173,7 +174,7 @@ class PrivilegedTaskService : IDesktopTaskBridge.Stub {
         if (ComponentName.unflattenFromString(component)?.packageName != BuildConfig.APPLICATION_ID)
             throw RemoteException("This fallback can only open DeX itself")
         if (displayId < 0) throw RemoteException("Invalid display")
-        return command(listOf("am", "start", "--displayId", displayId.toString(), "-n", component))
+        return command(listOf("am", "start", "--display", displayId.toString(), "-n", component))
     }
 
     override fun showRecents() {

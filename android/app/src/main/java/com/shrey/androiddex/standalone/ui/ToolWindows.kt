@@ -22,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,7 +69,7 @@ fun NotesContent(vm: DesktopViewModel, window: DesktopWindow) {
             IconButton(onClick = { vm.openNote(null) }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.NoteAdd, "New note", Modifier.size(19.dp)) }
             IconButton(onClick = { confirmDelete = true }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Delete, "Delete note", Modifier.size(18.dp)) }
         }
-        OutlinedTextField(text, { text = it }, Modifier.fillMaxSize(), placeholder = { Text("Start writing. Your note saves automatically on this tablet.") },
+        OutlinedTextField(text, { text = it }, Modifier.fillMaxSize().semantics { contentDescription = "Note editor" }, placeholder = { Text("Start writing. Your note saves automatically on this tablet.") },
             textStyle = MaterialTheme.typography.bodyMedium, minLines = 6)
     }
     if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("Delete this note?") },

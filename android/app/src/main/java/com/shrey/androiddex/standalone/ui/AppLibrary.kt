@@ -17,6 +17,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,7 +40,7 @@ fun AppLibrary(vm: DesktopViewModel, modifier: Modifier = Modifier, compact: Boo
         base.filter { it.label.contains(query, true) || it.packageName.contains(query, true) }
     }
     Column(modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = { Text("Search applications", fontSize = 13.sp) },
+        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().semantics { contentDescription = "Search applications" }, placeholder = { Text("Search applications", fontSize = 13.sp) },
             leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(19.dp)) },
             trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear search", Modifier.size(17.dp)) } },
             singleLine = true, textStyle = MaterialTheme.typography.bodyMedium, shape = RoundedCornerShape(10.dp))
