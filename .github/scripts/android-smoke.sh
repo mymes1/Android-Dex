@@ -110,15 +110,24 @@ fi
 # on this disposable CI emulator; the app itself never starts Shizuku or grants permission.
 step 'Installing official Shizuku'
 adb install -r "$APK_DIR/shizuku.apk"
-# Official Shizuku >=13 starter is the packaged native executable, not the old start.sh.
-SHIZUKU_LIB_DIR="$(adb shell dumpsys package moe.shizuku.privileged.api | tr -d '\r' | awk -F= '/nativeLibraryDir=/{print $2; exit}')"
-if [[ -z "$SHIZUKU_LIB_DIR" ]]; then
-  echo 'Could not locate the official Shizuku native starter' >&2
+# Official Shizuku >=13 starter is the packaged native executable libshizuku.so, not the
+# old start.sh. `dumpsys package` only prints legacyNativeLibraryDir (not nativeLibraryDir),
+# and the code path contains '==' segments, so never split on '='. Resolve the real extracted
+# starter from `pm path`: it lives at <codePath>/lib/<abi>/libshizuku.so on the device.
+SHIZUKU_APK="$(adb shell pm path moe.shizuku.privileged.api | tr -d '\r' | sed -n 's/^package://p' | head -1 || true)"
+SHIZUKU_SO=''
+if [[ -n "$SHIZUKU_APK" ]]; then
+  SHIZUKU_CODE_DIR="$(dirname "$SHIZUKU_APK")"
+  SHIZUKU_SO="$(adb shell "ls '$SHIZUKU_CODE_DIR'/lib/*/libshizuku.so 2>/dev/null" | tr -d '\r' | head -1 || true)"
+fi
+if [[ -z "$SHIZUKU_SO" ]]; then
+  echo 'Could not locate the official Shizuku native starter (libshizuku.so)' >&2
+  adb shell dumpsys package moe.shizuku.privileged.api > "$REPORT_DIR/shizuku-package.txt" 2>/dev/null || true
   exit 1
 fi
-step 'Starting Shizuku through official native starter'
+step "Starting Shizuku through official native starter: $SHIZUKU_SO"
 # Bound the start so a misbehaving starter can never hang the CI job; capture its output.
-timeout 60s adb shell "$SHIZUKU_LIB_DIR/libshizuku.so" 2>&1 | tee "$REPORT_DIR/shizuku-start.txt" || true
+timeout 60s adb shell "$SHIZUKU_SO" 2>&1 | tee "$REPORT_DIR/shizuku-start.txt" || true
 sleep 3
 adb shell ps -A > "$REPORT_DIR/processes.txt" 2>/dev/null || true
 
