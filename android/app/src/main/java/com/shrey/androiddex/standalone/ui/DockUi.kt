@@ -196,7 +196,7 @@ private fun NativeTasksPanel(vm: DesktopViewModel, onDismiss: () -> Unit) {
 
 /** Dark title bar drawn over a real Android freeform task; dragging calls the shell resize API. */
 @Composable
-fun NativeCaptionContent(vm: DesktopViewModel, taskId: Int, screenWidth: Int, screenHeight: Int) {
+fun NativeCaptionContent(vm: DesktopViewModel, taskId: Int, screenWidth: Int, screenHeight: Int, onGestureActive: (Boolean) -> Unit = {}) {
     // Overlay windows are owned by a Service lifecycle; collect directly so caption controls keep
     // updating while the underlying Android task changes mode/focus.
     val tasks by vm.tasks.collectAsState()
@@ -212,7 +212,11 @@ fun NativeCaptionContent(vm: DesktopViewModel, taskId: Int, screenWidth: Int, sc
         shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF34373F))) {
         Row(Modifier.fillMaxSize().padding(start = 8.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f).fillMaxHeight().pointerInput(taskId, screenWidth, screenHeight) {
-                detectDragGestures(onDragEnd = { latestBounds?.let { vm.commitNativeBounds(taskId, it) } }, onDragCancel = { latestBounds?.let { vm.commitNativeBounds(taskId, it) } }) { change, amount ->
+                detectDragGestures(
+                    onDragStart = { onGestureActive(true) },
+                    onDragEnd = { latestBounds?.let { vm.commitNativeBounds(taskId, it) }; onGestureActive(false) },
+                    onDragCancel = { latestBounds?.let { vm.commitNativeBounds(taskId, it) }; onGestureActive(false) },
+                ) { change, amount ->
                     val current = latestBounds ?: return@detectDragGestures
                     vm.dragNativeTask(taskId, current.moved(amount.x.toInt(), amount.y.toInt(), screenWidth, screenHeight))
                     change.consume()

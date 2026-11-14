@@ -85,6 +85,7 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
     private var windows: WindowManager? = null
     private val dockViews = mutableListOf<View>()
     private val captions = mutableMapOf<Int, CaptionWindow>()
+    private val activeCaptionGestures = mutableSetOf<Int>()
     private var panelView: View? = null
     private var activePanel: DockPanel? = null
     private var screenWidth = 0
@@ -278,13 +279,16 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
         val wanted = vm.tasks.value.filter { (it.freeform || it.id in maximized) && it.visible && it.id !in hidden && boundsMap[it.id]?.isEmpty == false }.associateBy { it.id }
         // Mode/visibility changes recreate the small caption window so its controls are guaranteed
         // to reflect the new state even if an overlay window does not invalidate composition promptly.
-        val remove = (captions.keys - wanted.keys) + if (recreate) captions.keys.intersect(wanted.keys) else emptySet()
+        val remove = (captions.keys - wanted.keys) + if (recreate) captions.keys.intersect(wanted.keys) - activeCaptionGestures else emptySet()
         remove.forEach { id -> captions.remove(id)?.let { runCatching { windows!!.removeViewImmediate(it.view) } } }
         wanted.forEach { (id, task) ->
             val bounds = boundsMap[id] ?: return@forEach
             val existing = captions[id]
             if (existing == null) {
-                val view = compose { NativeCaptionContent(vm, id, screenWidth, screenHeight) }
+                val view = compose {
+                    NativeCaptionContent(vm, id, screenWidth, screenHeight,
+                        onGestureActive = { active -> if (active) activeCaptionGestures += id else activeCaptionGestures -= id })
+                }
                 val params = WindowManager.LayoutParams(bounds.width, dp(38), WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,

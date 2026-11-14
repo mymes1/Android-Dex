@@ -366,6 +366,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
         _nativeBounds.value = _nativeBounds.value + (taskId to bounds)
     }
     fun dragNativeTask(taskId: Int, bounds: PixelBounds) {
+        Log.e("DesktopDockService", "Native drag task=$taskId bounds=$bounds")
         previewNativeBounds(taskId, bounds)
         nativeResizeRequests.trySend(NativeResizeRequest(taskId, bounds))
     }
