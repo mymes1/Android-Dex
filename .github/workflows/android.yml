@@ -159,13 +159,13 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
       - name: Publish emulator diagnostics for API-only environments
-        if: failure()
+        if: always()
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const dir = process.env.RUNNER_TEMP + '/android-emulator-reports';
-            let summary = 'Emulator failed. Available evidence follows.';
+            let summary = 'Emulator job status: ${{ job.status }}. Available evidence follows.';
             const names = ['progress.txt', 'release-startup.txt', 'release-pid.txt', 'release-crashes.txt', 'uiautomator-dump.txt', 'release-window.xml', 'debug-startup.txt', 'accessibility-setting.txt', 'accessibility-crash.txt', 'accessibility-before-tests.txt', 'accessibility-after-tests.txt', 'runtime-after-tests.txt', 'logcat-accessibility.txt', 'instrumentation.txt', 'shizuku-start.txt', 'shizuku-package.txt', 'shizuku-instrumentation.txt', 'summary.txt', 'failure-dump.txt', 'failure-window.xml'];
             for (const name of names) {
               const path = dir + '/' + name;
@@ -176,6 +176,7 @@ jobs:
               const path = dir + '/' + name;
               if (fs.existsSync(path) && summary.length < 58000) summary += '\n\n### ' + name + ' (tail)\n```text\n' + fs.readFileSync(path, 'utf8').slice(-6000) + '\n```';
             }
+            const conclusion = '${{ job.status }}' === 'success' ? 'success' : 'failure';
             await github.rest.checks.create({owner: context.repo.owner, repo: context.repo.repo,
-              name: 'Android emulator diagnostics', head_sha: context.sha, status: 'completed', conclusion: 'failure',
+              name: 'Android emulator diagnostics', head_sha: context.sha, status: 'completed', conclusion,
               output: {title: 'Android emulator diagnostics', summary: summary.slice(0, 64000)}});
