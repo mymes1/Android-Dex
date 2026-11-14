@@ -75,7 +75,7 @@ adb install -r "$APK_DIR/app-debug-androidTest.apk"
 step 'Enabling real AccessibilityService through test-harness ADB'
 adb shell settings put secure enabled_accessibility_services "$SERVICE"
 adb shell settings put secure accessibility_enabled 1
-adb shell am start -W -n "$DEBUG_PACKAGE/.MainActivity" > "$REPORT_DIR/debug-startup.txt"
+adb shell am start -W -n "$DEBUG_PACKAGE/com.shrey.androiddex.standalone.MainActivity" > "$REPORT_DIR/debug-startup.txt"
 sleep 2
 adb shell settings get secure enabled_accessibility_services | tee "$REPORT_DIR/accessibility-setting.txt"
 grep -q "$SERVICE" "$REPORT_DIR/accessibility-setting.txt"
