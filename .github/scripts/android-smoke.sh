@@ -32,7 +32,7 @@ adb install -r "$APK_DIR/app-debug-androidTest.apk"
 adb shell am start -W -n "$DEBUG_PACKAGE/.MainActivity" >/dev/null
 adb shell settings get secure enabled_accessibility_services | tee "$REPORT_DIR/accessibility-setting.txt"
 set +e
-adb shell am instrument -w -r -e notAnnotation org.junit.Ignore "$DEBUG_PACKAGE.test/androidx.test.runner.AndroidJUnitRunner" | tee "$REPORT_DIR/instrumentation.txt"
+adb shell am instrument -w -r -e notClass com.shrey.androiddex.standalone.ShizukuDeviceWorkflowTest "$DEBUG_PACKAGE.test/androidx.test.runner.AndroidJUnitRunner" | tee "$REPORT_DIR/instrumentation.txt"
 INSTRUMENT_STATUS=${PIPESTATUS[0]}
 set -e
 adb exec-out screencap -p > "$REPORT_DIR/after-tests.png"
@@ -43,4 +43,26 @@ if [[ "$INSTRUMENT_STATUS" -ne 0 ]] || ! grep -Eq '^OK \([0-9]+ tests?\)' "$REPO
   echo 'Instrumentation tests failed or did not complete' >&2
   exit 1
 fi
-printf 'Release installation/startup and instrumentation completed successfully.\n' | tee "$REPORT_DIR/summary.txt"
+# Exercise the real official Shizuku dialog and UserService. ADB starts the service only
+# on this disposable CI emulator; the app itself never starts Shizuku or grants permission.
+adb install -r "$APK_DIR/shizuku.apk"
+adb shell monkey -p moe.shizuku.privileged.api -c android.intent.category.LAUNCHER 1 >/dev/null
+for i in $(seq 1 20); do
+  if adb shell test -f /sdcard/Android/data/moe.shizuku.privileged.api/start.sh; then break; fi
+  sleep 1
+done
+adb shell 'nohup sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh >/data/local/tmp/shizuku-ci.log 2>&1 &'
+sleep 3
+adb shell cat /data/local/tmp/shizuku-ci.log > "$REPORT_DIR/shizuku-start.txt" || true
+set +e
+adb shell am instrument -w -r -e class com.shrey.androiddex.standalone.ShizukuDeviceWorkflowTest "$DEBUG_PACKAGE.test/androidx.test.runner.AndroidJUnitRunner" | tee "$REPORT_DIR/shizuku-instrumentation.txt"
+SHIZUKU_STATUS=${PIPESTATUS[0]}
+set -e
+adb exec-out screencap -p > "$REPORT_DIR/shizuku-authorized.png"
+adb shell uiautomator dump /sdcard/shizuku-window.xml >/dev/null || true
+adb shell cat /sdcard/shizuku-window.xml > "$REPORT_DIR/shizuku-window.xml" || true
+if [[ "$SHIZUKU_STATUS" -ne 0 ]] || ! grep -Eq '^OK \([0-9]+ tests?\)' "$REPORT_DIR/shizuku-instrumentation.txt"; then
+  echo 'Official Shizuku authorization/task-bridge test failed' >&2
+  exit 1
+fi
+printf 'Release startup, desktop/Accessibility instrumentation, and official Shizuku authorization/task bridge passed on the API 35 emulator. Wireless pairing and physical peripherals remain device-only tests.\n' | tee "$REPORT_DIR/summary.txt"

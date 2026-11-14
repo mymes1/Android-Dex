@@ -117,12 +117,17 @@ jobs:
         with:
           name: android-test-inputs
           path: ${{ runner.temp }}/apks
+      - name: Fetch official Shizuku for authorization workflow test
+        run: |
+          curl -fL --retry 3 -o "$RUNNER_TEMP/apks/shizuku.apk" \
+            https://github.com/RikkaApps/Shizuku/releases/download/v13.6.0/shizuku-v13.6.0.r1086.2650830c-release.apk
+          test "$(stat -c%s "$RUNNER_TEMP/apks/shizuku.apk")" = 2571773
       - name: Enable emulator KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: API 35 installation, startup and real Accessibility activation
+      - name: API 35 startup, Accessibility and official Shizuku authorization
         uses: reactivecircus/android-emulator-runner@v2
         env:
           APK_DIR: ${{ runner.temp }}/apks
@@ -151,7 +156,7 @@ jobs:
             const fs = require('fs');
             const dir = process.env.RUNNER_TEMP + '/android-emulator-reports';
             let summary = 'Emulator failed before producing reports.';
-            for (const name of ['release-startup.txt', 'instrumentation.txt', 'summary.txt']) {
+            for (const name of ['release-startup.txt', 'instrumentation.txt', 'shizuku-start.txt', 'shizuku-instrumentation.txt', 'summary.txt']) {
               const path = dir + '/' + name;
               if (fs.existsSync(path)) summary += '\n\n### ' + name + '\n```text\n' + fs.readFileSync(path, 'utf8').slice(-20000) + '\n```';
             }

@@ -13,6 +13,7 @@ import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
 
+@OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 class DesktopFlowTest {
     @get:Rule val compose = createEmptyComposeRule()
