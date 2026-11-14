@@ -1,6 +1,7 @@
 package com.shrey.androiddex.standalone.ui
 
 import android.accessibilityservice.AccessibilityService
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -221,7 +222,10 @@ fun NativeCaptionContent(vm: DesktopViewModel, taskId: Int, screenWidth: Int, sc
                 Text(vm.appLabel(task.packageName), fontSize = 11.sp, fontWeight = if (task.focused) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = { vm.minimizeNativeTask(taskId) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Minimize, "Minimize native window", Modifier.size(16.dp)) }
-            IconButton(onClick = { vm.toggleNativeMaximize(taskId) }, modifier = Modifier.size(32.dp)) { Icon(if (taskId in maximized) Icons.Default.FilterNone else Icons.Default.CropSquare, if (taskId in maximized) "Restore native window" else "Maximize native window", Modifier.size(15.dp)) }
+            IconButton(onClick = {
+                Log.e("DesktopDockService", "Caption maximize/restore clicked task=$taskId maximized=${taskId in maximized}")
+                vm.toggleNativeMaximize(taskId)
+            }, modifier = Modifier.size(32.dp)) { Icon(if (taskId in maximized) Icons.Default.FilterNone else Icons.Default.CropSquare, if (taskId in maximized) "Restore native window" else "Maximize native window", Modifier.size(15.dp)) }
             IconButton(onClick = { vm.closeNativeTask(taskId) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Close, "Close native window", Modifier.size(16.dp)) }
             Box(Modifier.size(22.dp, 30.dp).semantics { contentDescription = "Resize native window" }.pointerInput(taskId, screenWidth, screenHeight) {
                 detectDragGestures(onDragEnd = { latestBounds?.let { vm.commitNativeBounds(taskId, it) } }) { change, amount ->

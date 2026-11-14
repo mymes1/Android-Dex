@@ -235,7 +235,9 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
         return (display?.let { application.createDisplayContext(it) } ?: application).resources.displayMetrics
     }
     fun refreshTasks() {
-        taskJob?.cancel()
+        // Polling must not cancel an in-flight shell query every 1.5s; that can starve updates on
+        // slower firmware and race a just-applied maximize/restore back to stale task state.
+        if (taskJob?.isActive == true) return
         taskJob = viewModelScope.launch {
             if (!ShizukuManager.state.value.bridgeReady) {
                 _tasks.value = emptyList(); _tasksKnown.value = false
@@ -257,7 +259,10 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                     }
                     _nativeBounds.value = bounds
                 }
-                .onFailure { _tasks.value = emptyList(); _tasksKnown.value = false; _nativeBounds.value = emptyMap(); _taskError.value = it.message ?: "Task listing is unsupported on this firmware." }
+                .onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    _tasks.value = emptyList(); _tasksKnown.value = false; _nativeBounds.value = emptyMap(); _taskError.value = it.message ?: "Task listing is unsupported on this firmware."
+                }
         }
     }
     fun probeCapabilities() {
@@ -334,6 +339,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                     ShizukuManager.setTaskWindowingMode(taskId, 1)
                 }
             }.onSuccess {
+                Log.e("DesktopDockService", "Native mode request success task=$taskId maximize=$maximize")
                 _maximizedNativeTasks.value = if (maximize) _maximizedNativeTasks.value + taskId else _maximizedNativeTasks.value - taskId
                 // Update the caption immediately; the next shell poll confirms the real mode/bounds.
                 _tasks.value = _tasks.value.map { if (it.id == taskId) it.copy(windowingMode = if (maximize) 1 else 5) else it }
