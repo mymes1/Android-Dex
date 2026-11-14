@@ -148,6 +148,10 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
         lifecycle.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_START)
         lifecycle.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_RESUME)
         if (currentDisplayId != requestedDisplay || !::vm.isInitialized) setupDisplay(requestedDisplay)
+        if (windows == null) {
+            overlayError = "Display WindowManager unavailable"
+            Log.e("DesktopDockService", overlayError!!)
+        }
         showDockWindows()
         DesktopDockController.markRunning(true, currentDisplayId, overlayError ?: "")
         return START_STICKY
@@ -189,6 +193,7 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
     private fun compose(content: @Composable () -> Unit): ComposeView {
         val context = displayContext ?: this
         return ComposeView(context).apply {
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             setViewTreeLifecycleOwner(this@DesktopDockService)
             setViewTreeViewModelStoreOwner(this@DesktopDockService)
             setViewTreeSavedStateRegistryOwner(this@DesktopDockService)
@@ -225,6 +230,10 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
             DockTrayIsland(status, compact = compact,
                 onNotifications = { if (!DesktopAccessibilityService.navigate(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)) SystemActions.notificationAccess(this) },
                 onSettings = { openDesktopSettings() }, onTray = { togglePanel(DockPanel.TRAY) })
+        }
+        if (dockViews.isEmpty() && overlayError == null) {
+            overlayError = "No dock overlay windows were added"
+            Log.e("DesktopDockService", overlayError!!)
         }
     }
 

@@ -2,21 +2,22 @@ package com.shrey.androiddex.standalone
 
 import android.content.ComponentName
 import android.content.Context
+import android.graphics.Rect
 import android.provider.Settings
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.UiSelector
 import com.shrey.androiddex.standalone.data.AppEntry
 import com.shrey.androiddex.standalone.data.PixelBounds
 import com.shrey.androiddex.standalone.system.DesktopDockController
 import com.shrey.androiddex.standalone.system.ShizukuManager
 import kotlinx.coroutines.runBlocking
 import org.junit.*;
-import org.junit.Assert.*;
+import org.junit.Assert.*
 import org.junit.runner.RunWith
 
 /** Runs after official Shizuku authorization. CI grants SYSTEM_ALERT_WINDOW only on the disposable emulator. */
@@ -52,6 +53,39 @@ class NativeDesktopWorkflowTest {
         compose.onNodeWithContentDescription("Start menu").assertIsDisplayed()
     }
 
+    // TYPE_APPLICATION_OVERLAY windows are not always part of UiAutomator's active-window dump.
+    // Search every accessibility window so the test clicks the real dock/caption controls.
+    private fun windowTitles(): String = runCatching {
+        InstrumentationRegistry.getInstrumentation().uiAutomation.windows.joinToString { it.title?.toString() ?: "(untitled)" }
+    }.getOrDefault("(windows unavailable)")
+
+    private fun findOverlayNode(description: String? = null, text: String? = null): AccessibilityNodeInfo? {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        for (window in automation.windows) {
+            val root = window.root ?: continue
+            search(root, description, text)?.let { return it }
+        }
+        return null
+    }
+    private fun search(node: AccessibilityNodeInfo, description: String?, text: String?): AccessibilityNodeInfo? {
+        if (description != null && node.contentDescription?.toString() == description) return node
+        if (text != null && node.text?.toString() == text) return node
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            search(child, description, text)?.let { return it }
+        }
+        return null
+    }
+    private fun clickOverlay(description: String? = null, text: String? = null, timeoutMillis: Long = 8000) {
+        await(timeoutMillis) { findOverlayNode(description, text) != null }
+        val node = findOverlayNode(description, text)
+        assertNotNull("Overlay control not found: ${description ?: text}; windows=${windowTitles()}", node)
+        val bounds = Rect()
+        node!!.getBoundsInScreen(bounds)
+        assertFalse("Overlay control has empty bounds: ${description ?: text}", bounds.isEmpty)
+        assertTrue("Clicking overlay control ${description ?: text}", device.click(bounds.centerX(), bounds.centerY()))
+    }
+
     @Test fun nativeFreeformWindowAndOverlayDockControlRealTask() {
         Assume.assumeTrue("Official Shizuku must be installed", runCatching { context.packageManager.getApplicationInfo("moe.shizuku.privileged.api", 0) }.isSuccess)
         Assume.assumeTrue("CI must grant Display over other apps on the disposable emulator", Settings.canDrawOverlays(context))
@@ -69,7 +103,8 @@ class NativeDesktopWorkflowTest {
         compose.onNodeWithContentDescription("Persistent desktop dock").performScrollTo().performClick()
         await(10000) { DesktopDockController.state.value.running }
         assertTrue("The opt-in overlay dock should be running", DesktopDockController.state.value.running)
-        assertTrue("The dock start island should be visible over the desktop", device.findObject(UiSelector().description("Dock start")).waitForExists(8000))
+        await(8000) { findOverlayNode(description = "Dock start") != null }
+        assertNotNull("The dock start island should be visible; windows=${windowTitles()}; dock=${DesktopDockController.state.value}", findOverlayNode(description = "Dock start"))
         compose.onNodeWithContentDescription("Close Desktop settings").performClick()
 
         // Minimal ATD images do not guarantee a launchable AOSP Settings app. The androidTest APK
@@ -87,17 +122,17 @@ class NativeDesktopWorkflowTest {
         assertNotNull("The shell should report real task bounds", bounds)
         assertFalse(bounds!!.isEmpty)
 
-        val minimize = device.findObject(UiSelector().description("Minimize native window"))
-        assertTrue("The overlay should draw a dark caption over the native task", minimize.waitForExists(8000))
+        await(8000) { findOverlayNode(description = "Minimize native window") != null }
+        assertNotNull("The overlay should draw a dark caption over the native task; windows=${windowTitles()}", findOverlayNode(description = "Minimize native window"))
         // Touch the app content below the caption; the overlay must not steal the whole window.
         device.click(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)
         Thread.sleep(400)
         assertTrue(runBlocking { ShizukuManager.tasks(0) }.any { it.id == task.id && it.focused })
 
-        device.findObject(UiSelector().description("Maximize native window")).click()
+        clickOverlay(description = "Maximize native window")
         await(8000) { runBlocking { ShizukuManager.tasks(0) }.any { it.id == task.id && it.windowingMode == 1 } }
         assertEquals(1, runBlocking { ShizukuManager.tasks(0) }.first { it.id == task.id }.windowingMode)
-        device.findObject(UiSelector().description("Restore native window")).click()
+        clickOverlay(description = "Restore native window")
         await(8000) { runBlocking { ShizukuManager.tasks(0) }.any { it.id == task.id && it.windowingMode == 5 } }
 
         val before = runBlocking { ShizukuManager.taskBounds(task.id) }!!
@@ -107,18 +142,14 @@ class NativeDesktopWorkflowTest {
         assertNotNull(moved)
         assertTrue("Dragging the overlay caption should move the real Android task", moved!!.left != before.left || moved.top != before.top)
 
-        device.findObject(UiSelector().description("Minimize native window")).click()
+        clickOverlay(description = "Minimize native window")
         await(8000) { runBlocking { ShizukuManager.tasks(0) }.firstOrNull { it.id == task.id }?.visible != true }
-        device.findObject(UiSelector().description("Dock start")).click()
-        val tasksButton = device.findObject(UiSelector().text("Tasks"))
-        assertTrue(tasksButton.waitForExists(5000))
-        tasksButton.click()
-        val restore = device.findObject(UiSelector().text("Restore"))
-        assertTrue(restore.waitForExists(5000))
-        restore.click()
+        clickOverlay(description = "Dock start")
+        clickOverlay(text = "Tasks")
+        clickOverlay(text = "Restore")
         await(8000) { runBlocking { ShizukuManager.tasks(0) }.any { it.id == task.id && it.visible } }
 
-        device.findObject(UiSelector().description("Close native window")).click()
+        clickOverlay(description = "Close native window")
         await(8000) { runBlocking { ShizukuManager.tasks(0) }.none { it.id == task.id && it.running } }
         assertTrue("Closing the caption should remove the real Android task", runBlocking { ShizukuManager.tasks(0) }.none { it.id == task.id && it.running })
     }
