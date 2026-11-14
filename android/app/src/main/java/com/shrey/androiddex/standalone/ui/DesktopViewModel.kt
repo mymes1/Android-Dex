@@ -252,7 +252,6 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                     _minimizedNativeTasks.value = _minimizedNativeTasks.value.filterKeys { it in ids }
                     _hiddenNativeTasks.value = _hiddenNativeTasks.value.intersect(ids)
                     _maximizedNativeTasks.value = _maximizedNativeTasks.value.intersect(ids)
-                    restoreBounds.keys.retainAll(ids)
                     val bounds = _nativeBounds.value.filterKeys { it in ids }.toMutableMap()
                     running.filter { (it.freeform || it.id in _maximizedNativeTasks.value) && it.visible && it.id !in _hiddenNativeTasks.value }.take(12).forEach { task ->
                         ShizukuManager.taskBounds(task.id)?.let { bounds[task.id] = it }
@@ -332,10 +331,13 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                 if (!maximize) {
                     ShizukuManager.setTaskWindowingMode(taskId, 5)
                     val bounds = restoreBounds[taskId] ?: _nativeBounds.value[taskId]
-                    if (bounds != null) ShizukuManager.resizeTask(taskId, bounds)
+                    if (bounds != null) {
+                        ShizukuManager.resizeTask(taskId, bounds)
+                        previewNativeBounds(taskId, bounds)
+                    }
                 } else {
-                    val current = _nativeBounds.value[taskId] ?: ShizukuManager.taskBounds(taskId)
-                    if (current != null) restoreBounds[taskId] = current
+                    val current = ShizukuManager.taskBounds(taskId) ?: _nativeBounds.value[taskId]
+                    if (current != null && !current.isEmpty) restoreBounds[taskId] = current
                     ShizukuManager.setTaskWindowingMode(taskId, 1)
                 }
             }.onSuccess {
@@ -353,8 +355,11 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     fun closeNativeTask(taskId: Int) {
         viewModelScope.launch {
             runCatching { ShizukuManager.removeTask(NativeTask(taskId, displayId, "", "", true, false, false, false, 5)) }
-                .onSuccess { _hiddenNativeTasks.value = _hiddenNativeTasks.value - taskId; _minimizedNativeTasks.value = _minimizedNativeTasks.value - taskId; refreshTasks(); notify("Android window closed.") }
-                .onFailure { notify(it.message ?: "Could not close this Android window") }
+                .onSuccess {
+                    Log.e("DesktopDockService", "Native close request success task=$taskId")
+                    _hiddenNativeTasks.value = _hiddenNativeTasks.value - taskId; _minimizedNativeTasks.value = _minimizedNativeTasks.value - taskId; _maximizedNativeTasks.value = _maximizedNativeTasks.value - taskId; restoreBounds.remove(taskId); refreshTasks(); notify("Android window closed.")
+                }
+                .onFailure { Log.e("DesktopDockService", "Native close request failed task=$taskId", it); notify(it.message ?: "Could not close this Android window") }
         }
     }
     fun previewNativeBounds(taskId: Int, bounds: PixelBounds) {
