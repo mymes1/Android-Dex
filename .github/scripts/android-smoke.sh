@@ -135,18 +135,31 @@ adb shell ps -A > "$REPORT_DIR/processes.txt" 2>/dev/null || true
 adb shell appops set "$DEBUG_PACKAGE" SYSTEM_ALERT_WINDOW allow
 adb shell pm grant "$DEBUG_PACKAGE" android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
 
-step 'Running official Shizuku authorization, native freeform and overlay-dock instrumentation'
+step 'Running official Shizuku authorization/task-bridge instrumentation'
 set +e
-adb shell am instrument -w -r -e class com.shrey.androiddex.standalone.ShizukuDeviceWorkflowTest,com.shrey.androiddex.standalone.NativeDesktopWorkflowTest "$DEBUG_PACKAGE.test/androidx.test.runner.AndroidJUnitRunner" | tee "$REPORT_DIR/shizuku-instrumentation.txt"
+adb shell am instrument -w -r -e class com.shrey.androiddex.standalone.ShizukuDeviceWorkflowTest "$DEBUG_PACKAGE.test/androidx.test.runner.AndroidJUnitRunner" | tee "$REPORT_DIR/shizuku-instrumentation.txt"
 SHIZUKU_STATUS=${PIPESTATUS[0]}
 set -e
 adb exec-out screencap -p > "$REPORT_DIR/shizuku-authorized.png"
 adb shell uiautomator dump /sdcard/shizuku-window.xml >/dev/null 2>&1 || true
 adb shell cat /sdcard/shizuku-window.xml > "$REPORT_DIR/shizuku-window.xml" 2>/dev/null || true
-adb shell dumpsys window windows > "$REPORT_DIR/overlay-windows.txt" 2>/dev/null || true
-adb shell dumpsys activity activities > "$REPORT_DIR/native-tasks.txt" 2>/dev/null || true
 if [[ "$SHIZUKU_STATUS" -ne 0 ]] || ! grep -Eq '^OK \([0-9]+ tests?\)' "$REPORT_DIR/shizuku-instrumentation.txt"; then
   echo 'Official Shizuku authorization/task-bridge test failed' >&2
+  exit 1
+fi
+
+step 'Running native freeform window and overlay-dock instrumentation'
+set +e
+adb shell am instrument -w -r -e class com.shrey.androiddex.standalone.NativeDesktopWorkflowTest "$DEBUG_PACKAGE.test/androidx.test.runner.AndroidJUnitRunner" | tee "$REPORT_DIR/native-instrumentation.txt"
+NATIVE_STATUS=${PIPESTATUS[0]}
+set -e
+adb exec-out screencap -p > "$REPORT_DIR/native-desktop.png"
+adb shell uiautomator dump /sdcard/native-window.xml >/dev/null 2>&1 || true
+adb shell cat /sdcard/native-window.xml > "$REPORT_DIR/native-window.xml" 2>/dev/null || true
+adb shell dumpsys window windows > "$REPORT_DIR/overlay-windows.txt" 2>/dev/null || true
+adb shell dumpsys activity activities > "$REPORT_DIR/native-tasks.txt" 2>/dev/null || true
+if [[ "$NATIVE_STATUS" -ne 0 ]] || ! grep -Eq '^OK \([0-9]+ tests?\)' "$REPORT_DIR/native-instrumentation.txt"; then
+  echo 'Native freeform/overlay-dock test failed' >&2
   exit 1
 fi
 
