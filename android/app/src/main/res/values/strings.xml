@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Shrey\'s Android DeX</string>
+    <string name="accessibility_label">DeX desktop navigation</string>
+    <string name="accessibility_description">Optional desktop navigation. Detects which app is in the foreground and lets you use Back, Home, Recents and Lock. On request, lists actionable controls without reading their text. Does not record keystrokes, passwords, typed text or screen content. You can disable this service in Android Accessibility settings at any time.</string>
+</resources>
