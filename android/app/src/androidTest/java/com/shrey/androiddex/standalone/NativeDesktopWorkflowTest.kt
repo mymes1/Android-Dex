@@ -1,5 +1,6 @@
 package com.shrey.androiddex.standalone
 
+import android.content.ComponentName
 import android.content.Context
 import android.provider.Settings
 import androidx.compose.ui.test.*
@@ -70,15 +71,16 @@ class NativeDesktopWorkflowTest {
         assertTrue("The opt-in overlay dock should be running", DesktopDockController.state.value.running)
         compose.onNodeWithContentDescription("Close Desktop settings").performClick()
 
-        val launch = context.packageManager.getLaunchIntentForPackage("com.android.settings")?.component
-        Assume.assumeTrue("AOSP Settings must be launchable", launch != null)
-        val entry = AppEntry("com.android.settings", launch!!.flattenToShortString(), "Settings")
+        // Minimal ATD images do not guarantee a launchable AOSP Settings app. The androidTest APK
+        // declares this tiny real Activity so the test always exercises an actual Android task.
+        val target = ComponentName(InstrumentationRegistry.getInstrumentation().context, NativeTestTargetActivity::class.java)
+        val entry = AppEntry(target.packageName, target.flattenToShortString(), "Native test target")
         val metrics = context.resources.displayMetrics
         val requested = PixelBounds.cascade(metrics.widthPixels, metrics.heightPixels, metrics.density, 0)
         runBlocking { ShizukuManager.launchFreeform(entry, 0, requested) }
-        await(12000) { runBlocking { ShizukuManager.tasks(0) }.any { it.packageName == "com.android.settings" && it.freeform && it.visible } }
-        val task = runBlocking { ShizukuManager.tasks(0) }.firstOrNull { it.packageName == "com.android.settings" && it.freeform }
-        assertNotNull("Settings should be a real freeform task, not a fake embedded window", task)
+        await(12000) { runBlocking { ShizukuManager.tasks(0) }.any { it.packageName == target.packageName && it.freeform && it.visible } }
+        val task = runBlocking { ShizukuManager.tasks(0) }.firstOrNull { it.packageName == target.packageName && it.freeform }
+        assertNotNull("The test target should be a real freeform task, not a fake embedded window", task)
         assertEquals(5, task!!.windowingMode)
         val bounds = runBlocking { ShizukuManager.taskBounds(task.id) }
         assertNotNull("The shell should report real task bounds", bounds)

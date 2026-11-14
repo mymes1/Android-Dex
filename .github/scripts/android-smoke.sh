@@ -170,6 +170,11 @@ adb shell uiautomator dump /sdcard/native-window.xml >/dev/null 2>&1 || true
 adb shell cat /sdcard/native-window.xml > "$REPORT_DIR/native-window.xml" 2>/dev/null || true
 adb shell dumpsys window windows > "$REPORT_DIR/overlay-windows.txt" 2>/dev/null || true
 adb shell dumpsys activity activities > "$REPORT_DIR/native-tasks.txt" 2>/dev/null || true
+adb shell pm list packages > "$REPORT_DIR/packages.txt" 2>/dev/null || true
+if grep -Eq 'AssumptionViolatedException|INSTRUMENTATION_STATUS_CODE: -4' "$REPORT_DIR/native-instrumentation.txt"; then
+  echo 'Native freeform/overlay-dock test was skipped; a skipped assumption is not a pass' >&2
+  exit 1
+fi
 if [[ "$NATIVE_STATUS" -ne 0 ]] || ! grep -Eq '^OK \([0-9]+ tests?\)' "$REPORT_DIR/native-instrumentation.txt"; then
   echo 'Native freeform/overlay-dock test failed' >&2
   exit 1
