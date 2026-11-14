@@ -165,11 +165,17 @@ jobs:
           script: |
             const fs = require('fs');
             const dir = process.env.RUNNER_TEMP + '/android-emulator-reports';
-            let summary = 'Emulator failed before producing reports.';
-            for (const name of ['release-startup.txt', 'instrumentation.txt', 'shizuku-start.txt', 'shizuku-instrumentation.txt', 'summary.txt']) {
+            let summary = 'Emulator failed. Available evidence follows.';
+            const names = ['progress.txt', 'release-startup.txt', 'release-pid.txt', 'release-crashes.txt', 'uiautomator-dump.txt', 'release-window.xml', 'debug-startup.txt', 'accessibility-setting.txt', 'instrumentation.txt', 'shizuku-start.txt', 'shizuku-instrumentation.txt', 'summary.txt', 'failure-dump.txt', 'failure-window.xml'];
+            for (const name of names) {
               const path = dir + '/' + name;
-              if (fs.existsSync(path)) summary += '\n\n### ' + name + '\n```text\n' + fs.readFileSync(path, 'utf8').slice(-20000) + '\n```';
+              if (fs.existsSync(path)) summary += '\n\n### ' + name + '\n```text\n' + fs.readFileSync(path, 'utf8').slice(-12000) + '\n```';
+              if (summary.length > 52000) break;
+            }
+            for (const name of ['logcat.txt', 'activities.txt', 'accessibility-dump.txt', 'processes.txt']) {
+              const path = dir + '/' + name;
+              if (fs.existsSync(path) && summary.length < 58000) summary += '\n\n### ' + name + ' (tail)\n```text\n' + fs.readFileSync(path, 'utf8').slice(-6000) + '\n```';
             }
             await github.rest.checks.create({owner: context.repo.owner, repo: context.repo.repo,
               name: 'Android emulator diagnostics', head_sha: context.sha, status: 'completed', conclusion: 'failure',
-              output: {title: 'Android emulator diagnostics', summary}});
+              output: {title: 'Android emulator diagnostics', summary: summary.slice(0, 64000)}});
