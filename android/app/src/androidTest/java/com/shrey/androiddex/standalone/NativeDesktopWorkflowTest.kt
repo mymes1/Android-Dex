@@ -76,10 +76,21 @@ class NativeDesktopWorkflowTest {
         }
         return null
     }
+    private fun overlaySnapshot(): String = runCatching {
+        val labels = mutableListOf<String>()
+        fun visit(node: AccessibilityNodeInfo) {
+            node.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let { labels += "desc=$it" }
+            node.text?.toString()?.takeIf { it.isNotBlank() }?.let { labels += "text=$it" }
+            for (i in 0 until node.childCount) node.getChild(i)?.let(::visit)
+        }
+        InstrumentationRegistry.getInstrumentation().uiAutomation.windows.forEach { it.root?.let(::visit) }
+        labels.take(80).joinToString(" | ")
+    }.getOrDefault("(snapshot unavailable)")
+
     private fun clickOverlay(description: String? = null, text: String? = null, timeoutMillis: Long = 8000) {
         await(timeoutMillis) { findOverlayNode(description, text) != null }
         val node = findOverlayNode(description, text)
-        assertNotNull("Overlay control not found: ${description ?: text}; windows=${windowTitles()}", node)
+        assertNotNull("Overlay control not found: ${description ?: text}; windows=${windowTitles()}; nodes=${overlaySnapshot()}", node)
         val bounds = Rect()
         node!!.getBoundsInScreen(bounds)
         assertFalse("Overlay control has empty bounds: ${description ?: text}", bounds.isEmpty)

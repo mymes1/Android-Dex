@@ -196,10 +196,12 @@ private fun NativeTasksPanel(vm: DesktopViewModel, onDismiss: () -> Unit) {
 /** Dark title bar drawn over a real Android freeform task; dragging calls the shell resize API. */
 @Composable
 fun NativeCaptionContent(vm: DesktopViewModel, taskId: Int, screenWidth: Int, screenHeight: Int) {
-    val tasks by vm.tasks.collectAsStateWithLifecycle()
-    val boundsFlow by vm.nativeBounds.collectAsStateWithLifecycle()
-    val hidden by vm.hiddenNativeTasks.collectAsStateWithLifecycle()
-    val maximized by vm.maximizedNativeTasks.collectAsStateWithLifecycle()
+    // Overlay windows are owned by a Service lifecycle; collect directly so caption controls keep
+    // updating while the underlying Android task changes mode/focus.
+    val tasks by vm.tasks.collectAsState()
+    val boundsFlow by vm.nativeBounds.collectAsState()
+    val hidden by vm.hiddenNativeTasks.collectAsState()
+    val maximized by vm.maximizedNativeTasks.collectAsState()
     val task = tasks.firstOrNull { it.id == taskId }
     val bounds = boundsFlow[taskId]
     val density = LocalDensity.current.density
