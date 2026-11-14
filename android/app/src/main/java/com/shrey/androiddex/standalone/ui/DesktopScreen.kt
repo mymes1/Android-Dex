@@ -97,6 +97,9 @@ fun DesktopScreen(vm: DesktopViewModel, onReviewSetup: () -> Unit) {
     LaunchedEffect(vm) { vm.messages.collect { snackbar.showSnackbar(it) } }
     LaunchedEffect(shizuku.bridgeReady) { vm.probeCapabilities(); vm.refreshTasks() }
     LaunchedEffect(Unit) { rootFocus.requestFocus() }
+    LaunchedEffect(start, tray, menu) {
+        if (!start && !tray && menu == null) rootFocus.requestFocus()
+    }
     DisposableEffect(context, vm) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) { vm.appsRepository.invalidateIcons(); vm.refreshApps() }

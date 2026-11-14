@@ -1,5 +1,6 @@
 package com.shrey.androiddex.standalone
 
+import android.content.ComponentName
 import android.content.Context
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.*
@@ -7,6 +8,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
 import com.shrey.androiddex.standalone.data.PreferencesRepository
 import com.shrey.androiddex.standalone.system.DesktopAccessibilityService
 import org.junit.*
@@ -75,6 +77,7 @@ class DesktopFlowTest {
         compose.onRoot().performKeyInput { pressKey(Key.Escape) }
         compose.onNodeWithText("Your applications").assertDoesNotExist()
         compose.onRoot().performKeyInput { pressKey(Key.MetaLeft) }
+        compose.waitUntil(5000) { compose.onAllNodesWithText("Your applications").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Your applications").assertIsDisplayed()
         compose.onRoot().performKeyInput { pressKey(Key.Escape) }
         compose.onNodeWithText("Calculator", substring = false).performClick()
@@ -92,9 +95,14 @@ class DesktopFlowTest {
     }
 
     @Test fun accessibilityActivationIsObservedWhenTestHarnessEnablesIt() {
-        Assume.assumeTrue("CI enables the real service using test-only ADB before this test", DesktopAccessibilityService.isEnabled(context))
-        // The service is bound by Android in the app process; Compose idling does not advance that binder callback.
-        val deadline = System.currentTimeMillis() + 15000
+        // `am instrument` restarts the target process, so the disposable-emulator harness re-applies
+        // the test-only ADB grant here. Application code never writes Accessibility settings.
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        val service = ComponentName(context, DesktopAccessibilityService::class.java).flattenToString()
+        device.executeShellCommand("settings put secure enabled_accessibility_services $service")
+        device.executeShellCommand("settings put secure accessibility_enabled 1")
+        Assume.assumeTrue("Test harness enabled the real service", DesktopAccessibilityService.isEnabled(context))
+        val deadline = System.currentTimeMillis() + 20000
         while (!DesktopAccessibilityService.connected() && System.currentTimeMillis() < deadline) Thread.sleep(100)
         assertTrue("Android should bind the enabled AccessibilityService", DesktopAccessibilityService.connected())
         assertTrue(DesktopAccessibilityService.state.value.bound)

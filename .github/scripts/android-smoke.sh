@@ -93,6 +93,9 @@ adb shell am instrument -w -r -e notClass com.shrey.androiddex.standalone.Shizuk
 INSTRUMENT_STATUS=${PIPESTATUS[0]}
 set -e
 adb exec-out screencap -p > "$REPORT_DIR/after-tests.png"
+adb shell dumpsys accessibility > "$REPORT_DIR/accessibility-after-tests.txt" 2>/dev/null || true
+adb logcat -d -s AndroidRuntime:E > "$REPORT_DIR/runtime-after-tests.txt" 2>/dev/null || true
+adb logcat -d | grep -Ei 'DesktopAccessibilityService|AccessibilityService|AndroidRuntime|FATAL EXCEPTION|com.shrey.androiddex.standalone.debug' | tail -300 > "$REPORT_DIR/logcat-accessibility.txt" 2>/dev/null || true
 adb shell settings put secure enabled_accessibility_services ''
 adb shell settings put secure accessibility_enabled 0
 if [[ "$INSTRUMENT_STATUS" -ne 0 ]] || ! grep -Eq '^OK \([0-9]+ tests?\)' "$REPORT_DIR/instrumentation.txt"; then
