@@ -96,7 +96,7 @@ No wake lock, boot receiver or hidden polling daemon. The Accessibility Service 
 
 ## Tests
 
-JVM tests cover geometry, native pixel-bounds parsing/move/resize/cascade, calculator parsing and permission/capability truth tables. Compose instrumentation covers first-run completion, persistence, real notes, window controls/taskbar, Start/search/keyboard shortcuts, absent-Shizuku behavior and real Accessibility binding. A separate instrumented workflow exercises official Shizuku authorization plus real freeform launch, overlay caption drag, maximize/restore, minimize/restore and close on an AOSP Settings task.
+JVM tests cover geometry, native pixel-bounds parsing/move/resize/cascade, calculator parsing and permission/capability truth tables. Compose instrumentation covers first-run completion, persistence, real notes, window controls/taskbar, Start/search/keyboard shortcuts, absent-Shizuku behavior and real Accessibility binding. Separate instrumented passes exercise official Shizuku authorization and then real freeform launch, overlay caption drag, maximize/restore, minimize/restore and close. The native pass targets a test-only `NativeTestTargetActivity` (a real Android task in the androidTest APK) because minimal AOSP ATD images do not guarantee a launchable Settings app; the harness treats a skipped native assumption as a failure, not a pass.
 
 The `Standalone Android build and tests` workflow builds debug/test/lint, builds and verifies a release-mode APK, installs that APK on an API 35 emulator, checks startup, then runs instrumentation. Emulator screenshots/logs are uploaded as evidence. The test harness—not application code—enables Accessibility and grants the overlay app-op/POST_NOTIFICATIONS only on that disposable emulator.
 
