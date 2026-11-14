@@ -25,5 +25,8 @@ or the legacy PC logic engine. It uses the official Shizuku API/provider
 (Apache License 2.0). See android/THIRD_PARTY_NOTICES.md and the license
 texts under android/app/src/main/assets/licenses/.
 
+The bundled standalone wallpaper is a UI-free crop of the original project's
+Data/home_screen.png artwork and remains under the original project notice.
+
 The original proprietary project license is retained. This notice does not
 relicense the original project or grant commercial redistribution rights.

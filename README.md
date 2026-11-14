@@ -7,17 +7,18 @@
 
 ## Android app
 
-- Native APK, dark graphite desktop, wallpaper selection, draggable shortcuts and right-click menus.
+- Native APK styled after the original Android-Dex home screen: blue-floral wallpaper, Google/Perplexity search bars, analog clock, draggable shortcuts, frosted app drawer and bottom islands for navigation, media, apps, battery and clock.
+- Real Android apps can open in **native freeform windows** through authorized Shizuku. An opt-in **Display over other apps** dock keeps dark window bars and controls over those real tasks; dragging/resizing/minimize/maximize/close operate on the actual Android tasks.
 - Real draggable/resizable/minimizable/maximizable windows for Notes, Files, Calculator, App Library, Settings and Device information.
-- Bottom taskbar, searchable Start menu, installed apps, pins, local recent launches, battery, connectivity, clock, volume and quick settings.
-- Official Shizuku API 13.1.5 integration: installation/service detection, real authorization requests, denial/revocation handling, reconnect/troubleshooting UI and an on-demand shell task bridge.
+- Official Shizuku API 13.1.5 integration: installation/service detection, real authorization requests, denial/revocation handling, reconnect/troubleshooting UI and an on-demand shell task/window bridge.
 - Optional, genuine Accessibility Service for foreground changes, Back/Home/Recents/Lock, a return/navigation overlay and a privacy-preserving control inspector.
+- Optional notification access powers the now-playing media island and notification count using media metadata only; notification bodies are not read or stored.
 - Touch, Android's hardware mouse cursor, Bluetooth/USB keyboards and mice, trackpads, keyboard shortcuts and runtime-detected Android displays.
 - Local-only notes and preferences; user-selected folder access through Storage Access Framework; no INTERNET or broad storage permission.
 
 ### Important Android limits
 
-Other Android apps are **launched and switched**, not illegally embedded inside this APK. Their fullscreen/split-screen/freeform behavior belongs to Android. Native freeform is offered only after live capability checks and Shizuku authorization, and firmware may still override it. The app does not show fake window controls for third-party activities.
+Other Android apps are **rendered by Android**, not captured or illegally embedded inside this APK. With Shizuku and active freeform support they open in real system windows; the optional overlay draws title bars/dock controls and sends validated shell task commands. Firmware or a fixed-size app may still refuse freeform, in which case DeX falls back to normal Android launching/Recents. Display over other apps does not grant screen capture, and the dock never fakes an app's video.
 
 The target **Galaxy Tab A9 Wi-Fi (SM-X110)** has USB 2.0 and no MHL video output; a passive USB-C HDMI adapter cannot add wired desktop video. See [device compatibility](doc/STANDALONE_COMPATIBILITY.md).
 
@@ -27,7 +28,8 @@ The target **Galaxy Tab A9 Wi-Fi (SM-X110)** has USB 2.0 and no MHL video output
 2. Open the APK on the tablet and allow installation from that source through Android's normal prompt.
 3. Follow the in-app setup. For advanced features, install the official [Shizuku](https://github.com/RikkaApps/Shizuku/releases/latest), enable Wireless debugging, pair/start Shizuku, then request permission in DeX.
 4. Optionally enable **DeX desktop navigation** in Android Accessibility settings.
-5. Enter the desktop. Optional permissions can be skipped; setup does not reappear on every launch.
+5. For real app windows, enable **native app windows** in Device & compatibility, then turn on the **persistent desktop dock** and allow **Display over other apps**. Optionally allow notification access for the media island/badge.
+6. Enter the desktop. Optional permissions can be skipped; setup does not reappear on every launch.
 
 **After a reboot, Shizuku must be started again using Wireless debugging.** DeX detects this and keeps normal desktop tools available. Detailed Samsung setup and recovery instructions: [Setup guide](doc/STANDALONE_SETUP.md).
 

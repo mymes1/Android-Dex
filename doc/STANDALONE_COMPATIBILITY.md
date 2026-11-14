@@ -17,8 +17,10 @@ Samsung's SM-X110 specifications list an 8.7-inch 1340 × 800 display, **USB 2.0
 | --- | --- |
 | Standalone APK | Real native Activity; no PC or remote session |
 | Local desktop windows | Real Notes/Files/Calculator/App Library/Settings/Device windows; drag, resize, minimize, maximize, close, focus |
-| Arbitrary apps inside those windows | **Not supported by Android's public app sandbox.** Apps launch in Android instead; no screenshots pretending to be interactive windows |
-| Native freeform | Runtime feature flag + authorized shell settings/task API probe; explicit experimental launch; firmware/app can override |
+| Arbitrary apps captured/embedded inside DeX views | **Not supported by Android's public app sandbox.** Apps are rendered by Android; no screenshots pretending to be interactive video |
+| Native freeform app windows | Runtime feature flag + authorized shell settings/task API probe; explicit consent; real system windows with overlay caption controls; firmware/app can override |
+| Persistent dock / dark window bars | Opt-in `SYSTEM_ALERT_WINDOW` foreground service; draws controls over real tasks, stops on revocation; does not capture app video |
+| Media island / notification badge | Optional notification listener; media metadata/playback and count only; no notification bodies |
 | Force-resizable activities | Optional, explicit development-setting consent; can break app layouts; reversible |
 | Split-screen / Recents | Real Android system features; Accessibility or authorized shell can open Recents |
 | Running apps | Real shell task list when compatible; otherwise explicit fallback. Recent launches are labeled as history |
@@ -26,7 +28,7 @@ Samsung's SM-X110 specifications list an 8.7-inch 1340 × 800 display, **USB 2.0
 | Shizuku after reboot | Must be started again through Wireless debugging; no root/auto-start bypass |
 | Accessibility | Genuine user-enabled service; foreground package changes and explicit navigation; process death is not inferred from window changes |
 | Accessibility text/input | Not collected; no key filtering; inspector excludes password/editable nodes and does not read labels/text |
-| Return overlay | Optional accessibility overlay; no SYSTEM_ALERT_WINDOW permission |
+| Return overlay | Optional accessibility overlay; separate from the opt-in SYSTEM_ALERT_WINDOW dock |
 | Power/restart | Android power dialog via Accessibility; restart only if firmware offers it |
 | Wi-Fi/Bluetooth toggles | Open Android panels/settings; no silent privileged connectivity toggle |
 | External displays | Only Android-exposed public presentation displays; own desktop Activity can be launched there; SM-X110 wired video unavailable |
@@ -36,7 +38,7 @@ Samsung's SM-X110 specifications list an 8.7-inch 1340 × 800 display, **USB 2.0
 
 ## Why Shizuku is not a compositor
 
-Shizuku executes authorized code with the shell UID. It does not grant an app permission to bypass Activity visibility, embed another package's UI, or become the system window manager. This implementation uses a narrow UserService for task queries/switches and validated launches. It does not use root, disable SELinux, patch SystemUI, or inject arbitrary touches into other apps.
+Shizuku executes authorized code with the shell UID. It does not grant an app permission to bypass Activity visibility, capture/embed another package's UI, or replace the system compositor. This implementation uses a narrow UserService for task queries, bounds, windowing-mode/visibility changes and validated launches. The overlay permission draws DeX controls above those real windows; it does not turn DeX into a video compositor. It does not use root, disable SELinux, patch SystemUI, or inject arbitrary touches into other apps.
 
 Freeform support is heterogeneous: a feature flag can be absent while a development override exists; a global override can be present while an individual activity refuses resizing; Samsung can ignore or customize AOSP behavior. The UI therefore reports probe results and treats every native freeform launch as a request, not a guarantee.
 

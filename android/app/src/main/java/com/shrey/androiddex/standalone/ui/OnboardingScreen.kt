@@ -32,6 +32,7 @@ fun OnboardingScreen(vm: DesktopViewModel, onFinish: () -> Unit) {
     var step by rememberSaveable { mutableIntStateOf(0) }
     val shizuku by ShizukuManager.state.collectAsStateWithLifecycle()
     val accessibility by DesktopAccessibilityService.state.collectAsStateWithLifecycle()
+    val dock by com.shrey.androiddex.standalone.system.DesktopDockController.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val titles = listOf("Your tablet. Your desktop.", "Connect advanced features", "Navigate beyond the desktop", "Ready for your workspace")
     Box(Modifier.fillMaxSize().background(Brush.linearGradient(wallpaperGradients[0])).windowInsetsPadding(WindowInsets.safeDrawing).padding(24.dp)) {
@@ -75,8 +76,7 @@ fun OnboardingScreen(vm: DesktopViewModel, onFinish: () -> Unit) {
                             SectionTitle("Your choices are saved", "Setup will not interrupt every launch. Recheck live status any time in Desktop settings.")
                             StatusLine("Shizuku: ${shizuku.label}", shizuku.authorized, if (shizuku.authorized) "Advanced features connect on demand." else "Optional skipped or not yet connected. Normal desktop tools remain available.")
                             StatusLine("Accessibility: ${if (accessibility.bound) "enabled and bound" else "not enabled"}", accessibility.bound, "Optional foreground detection and navigation.")
-                            StatusLine("Persistent dock: ${if (com.shrey.androiddex.standalone.system.DesktopDockController.state.value.running) "visible" else "optional / off"}",
-                                com.shrey.androiddex.standalone.system.DesktopDockController.state.value.running,
+                            StatusLine("Persistent dock: ${if (dock.running) "visible" else "optional / off"}", dock.running,
                                 "Display over other apps is checked live. It draws dock controls and window bars only; it never captures app video.")
                             Text("After a reboot, Shizuku must be started again using Wireless debugging. This app will detect that it stopped and never display a false connected state.", color = DexWarning, fontSize = 13.sp)
                         }

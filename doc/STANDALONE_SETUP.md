@@ -36,6 +36,13 @@ If a sideloaded build shows Android's **Restricted setting** prompt, use Android
 
 The inspector deliberately shows generic control labels, not text from the other app. Password and editable fields are excluded. It can send a tap/hold/scroll only when you explicitly choose that control.
 
+### Optional persistent dock and media island
+
+1. In DeX settings, turn on **Persistent desktop dock**. Android opens **Display over other apps**; allow it for Shrey's Android DeX, then return. The dock starts only after both the DeX setting and Android grant are present.
+2. The dock keeps navigation, apps, media, battery/clock and settings islands over real Android apps. Gaps between islands pass touches through. Dark window bars appear over native freeform tasks and can drag, resize, minimize, maximize/restore or close the actual task.
+3. Use **Hide dock** in the ongoing notification or DeX settings to stop it. Revoking Display over other apps also stops it.
+4. For the original-style now-playing island and notification badge, open **Notification access** and allow **DeX media and notification badge**. This uses media metadata and a count only; notification bodies are not read or stored.
+
 ## 5. After a reboot or service stop
 
 Wireless debugging and Shizuku's shell service do not survive a reboot as an auto-starting root daemon. Reopen Shizuku and start it via Wireless debugging; pairing is normally retained, but Android may require pairing again after network/debugging changes. Return to DeX and refresh. If permission was revoked, allow DeX again inside Shizuku's authorized-app settings.
@@ -63,6 +70,6 @@ Troubleshooting:
 
 ## 7. Displays and freeform
 
-**Device & displays** reports actual feature flags, display metrics and shell settings. Native freeform is experimental: an explicit consent dialog explains the two global development keys before changing them. You can restore both to `0`. No density/resolution command is issued.
+**Device & displays** reports actual feature flags, display metrics and shell settings. Tap **Enable native app windows** and approve the consent dialog before DeX changes the global development keys. After that, apps launched from DeX prefer real Android freeform windows; the optional dock draws the dark title bars. You can restore both keys to `0`. No density/resolution command is issued. If firmware refuses a mode/bounds change, DeX reports the refusal instead of pretending the app was embedded.
 
 SM-X110 cannot output wired video through its USB-C port. Android-visible public presentation displays can receive another DeX Activity where supported; a display that Android does not expose cannot be created by this app. See [compatibility](STANDALONE_COMPATIBILITY.md).
