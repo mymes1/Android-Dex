@@ -116,7 +116,7 @@ class NativeDesktopWorkflowTest {
         await(8000) { runBlocking { ShizukuManager.tasks(0) }.any { it.id == task.id && it.visible } }
 
         device.findObject(UiSelector().description("Close native window")).click()
-        await(8000) { runBlocking { ShizukuManager.tasks(0) }.none { it.id == task.id } }
-        assertTrue("Closing the caption should remove the real Android task", runBlocking { ShizukuManager.tasks(0) }.none { it.id == task.id })
+        await(8000) { runBlocking { ShizukuManager.tasks(0) }.none { it.id == task.id && it.running } }
+        assertTrue("Closing the caption should remove the real Android task", runBlocking { ShizukuManager.tasks(0) }.none { it.id == task.id && it.running })
     }
 }

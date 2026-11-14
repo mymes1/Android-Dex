@@ -246,7 +246,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                     _maximizedNativeTasks.value = _maximizedNativeTasks.value.intersect(ids)
                     restoreBounds.keys.retainAll(ids)
                     val bounds = _nativeBounds.value.filterKeys { it in ids }.toMutableMap()
-                    running.filter { it.freeform && it.visible && it.id !in _hiddenNativeTasks.value }.take(12).forEach { task ->
+                    running.filter { (it.freeform || it.id in _maximizedNativeTasks.value) && it.visible && it.id !in _hiddenNativeTasks.value }.take(12).forEach { task ->
                         ShizukuManager.taskBounds(task.id)?.let { bounds[task.id] = it }
                     }
                     _nativeBounds.value = bounds

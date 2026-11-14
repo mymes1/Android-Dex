@@ -258,7 +258,8 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
         if (windows == null || !::vm.isInitialized) return
         val hidden = vm.hiddenNativeTasks.value
         val boundsMap = vm.nativeBounds.value
-        val wanted = vm.tasks.value.filter { it.freeform && it.visible && it.id !in hidden && boundsMap[it.id]?.isEmpty == false }.associateBy { it.id }
+        val maximized = vm.maximizedNativeTasks.value
+        val wanted = vm.tasks.value.filter { (it.freeform || it.id in maximized) && it.visible && it.id !in hidden && boundsMap[it.id]?.isEmpty == false }.associateBy { it.id }
         val remove = captions.keys - wanted.keys
         remove.forEach { id -> captions.remove(id)?.let { runCatching { windows!!.removeViewImmediate(it.view) } } }
         wanted.forEach { (id, task) ->
