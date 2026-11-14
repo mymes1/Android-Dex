@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -89,6 +90,7 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
     private var screenWidth = 0
     private var screenHeight = 0
     private var density = 1f
+    private var overlayError: String? = null
 
     private data class CaptionWindow(val view: ComposeView, val params: WindowManager.LayoutParams)
 
@@ -147,7 +149,7 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
         lifecycle.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_RESUME)
         if (currentDisplayId != requestedDisplay || !::vm.isInitialized) setupDisplay(requestedDisplay)
         showDockWindows()
-        DesktopDockController.markRunning(true, currentDisplayId)
+        DesktopDockController.markRunning(true, currentDisplayId, overlayError ?: "")
         return START_STICKY
     }
 
@@ -197,13 +199,16 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
 
     private fun showDockWindows() {
         if (dockViews.isNotEmpty() || windows == null) return
+        overlayError = null
         val widthDp = screenWidth / density
         val compact = widthDp < 640
         val trayWidth = if (compact) 218 else 300
         fun add(widthDp: Int, gravity: Int, xDp: Int, content: @Composable () -> Unit) {
             val view = compose(content)
             val params = baseParams(dp(widthDp), dp(56), gravity, false).apply { x = dp(xDp); y = dp(10) }
-            runCatching { windows!!.addView(view, params) }.onSuccess { dockViews += view }
+            runCatching { windows!!.addView(view, params) }
+                .onSuccess { dockViews += view }
+                .onFailure { overlayError = "Dock overlay refused: ${it.message?.take(180)}"; Log.e("DesktopDockService", "Dock addView failed", it) }
         }
         add(184, Gravity.BOTTOM or Gravity.START, 12) {
             DockNavigationBar(onStart = { togglePanel(DockPanel.APPS) }, onHome = { SystemActions.desktop(this, currentDisplayId); dismissPanel() },
@@ -275,7 +280,9 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
                     title = "DeX window bar ${task.packageName}"
                     setFitInsetsTypes(0)
                 }
-                runCatching { windows!!.addView(view, params) }.onSuccess { captions[id] = CaptionWindow(view, params) }
+                runCatching { windows!!.addView(view, params) }
+                    .onSuccess { captions[id] = CaptionWindow(view, params) }
+                    .onFailure { overlayError = "Window bar overlay refused: ${it.message?.take(180)}"; Log.e("DesktopDockService", "Caption addView failed", it) }
             } else {
                 val p = existing.params
                 if (p.width != bounds.width || p.x != bounds.left || p.y != bounds.top) {

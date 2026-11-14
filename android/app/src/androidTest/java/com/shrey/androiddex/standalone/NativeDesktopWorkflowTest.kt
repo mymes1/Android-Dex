@@ -69,6 +69,7 @@ class NativeDesktopWorkflowTest {
         compose.onNodeWithContentDescription("Persistent desktop dock").performScrollTo().performClick()
         await(10000) { DesktopDockController.state.value.running }
         assertTrue("The opt-in overlay dock should be running", DesktopDockController.state.value.running)
+        assertTrue("The dock start island should be visible over the desktop", device.findObject(UiSelector().description("Dock start")).waitForExists(8000))
         compose.onNodeWithContentDescription("Close Desktop settings").performClick()
 
         // Minimal ATD images do not guarantee a launchable AOSP Settings app. The androidTest APK

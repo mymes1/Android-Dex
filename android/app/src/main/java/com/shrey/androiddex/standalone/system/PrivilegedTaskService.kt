@@ -51,7 +51,12 @@ class PrivilegedTaskService : IDesktopTaskBridge.Stub {
                 if (component.packageName == "com.android.systemui") return@mapNotNull null
                 val configuration = read(task, "configuration")
                 val windowConfiguration = configuration?.let { read(it, "windowConfiguration") }
-                val mode = windowConfiguration?.let { read(it, "windowingMode") } as? Int ?: -1
+                // WindowConfiguration stores the mode in private mWindowingMode; the public
+                // accessor is getWindowingMode(). Reading a non-existent public field returned -1.
+                val mode = windowConfiguration?.let { wc ->
+                    runCatching { wc.javaClass.getMethod("getWindowingMode").invoke(wc) as? Int }.getOrNull()
+                        ?: read(wc, "windowingMode") as? Int
+                } ?: -1
                 val id = integer(task, "taskId", -1)
                 read(task, "token")?.let { token -> if (id >= 0) taskTokens[id] = token }
                 DesktopTask(id, taskDisplay, component.packageName, component.flattenToShortString(),
