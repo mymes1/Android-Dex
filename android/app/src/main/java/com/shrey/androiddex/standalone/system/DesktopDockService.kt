@@ -279,8 +279,13 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
         val wanted = vm.tasks.value.filter { (it.freeform || it.id in maximized) && it.visible && it.id !in hidden && boundsMap[it.id]?.isEmpty == false }.associateBy { it.id }
         // Mode/visibility changes recreate the small caption window so its controls are guaranteed
         // to reflect the new state even if an overlay window does not invalidate composition promptly.
-        val remove = (captions.keys - wanted.keys) + if (recreate) captions.keys.intersect(wanted.keys) - activeCaptionGestures else emptySet()
-        remove.forEach { id -> captions.remove(id)?.let { runCatching { windows!!.removeViewImmediate(it.view) } } }
+        val stale = captions.keys - wanted.keys
+        val recreateIds = if (recreate) (captions.keys.intersect(wanted.keys) - activeCaptionGestures) else emptySet()
+        (stale + recreateIds).forEach { id ->
+            activeCaptionGestures -= id
+            vm.endNativeGesture(id)
+            captions.remove(id)?.let { runCatching { windows!!.removeViewImmediate(it.view) } }
+        }
         wanted.forEach { (id, task) ->
             val bounds = boundsMap[id] ?: return@forEach
             val existing = captions[id]
@@ -312,6 +317,8 @@ class DesktopDockService : Service(), androidx.lifecycle.LifecycleOwner, ViewMod
 
     private fun removeAllWindows() {
         dismissPanel()
+        captions.keys.forEach { id -> if (::vm.isInitialized) vm.endNativeGesture(id) }
+        activeCaptionGestures.clear()
         captions.values.forEach { runCatching { windows?.removeViewImmediate(it.view) } }; captions.clear()
         dockViews.forEach { runCatching { windows?.removeViewImmediate(it) } }; dockViews.clear()
     }

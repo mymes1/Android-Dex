@@ -148,11 +148,13 @@ class NativeDesktopWorkflowTest {
 
         val before = runBlocking { ShizukuManager.taskBounds(task.id) }!!
         // Keep the gesture inside the 38dp caption window while still moving the real task.
-        device.swipe(before.left + before.width / 3, before.top + 20, before.left + before.width / 3 + 140, before.top + 20, 24)
+        val captionMidY = before.top + ((38 * metrics.density).toInt() / 2)
+        val dragStartX = before.left + before.width / 3
+        device.swipe(dragStartX, captionMidY, dragStartX + 140, captionMidY, 24)
         await(6000) { runCatching { runBlocking { ShizukuManager.taskBounds(task.id) } }.getOrNull()?.let { it.left != before.left || it.top != before.top } == true }
         val moved = runBlocking { ShizukuManager.taskBounds(task.id) }
         assertNotNull(moved)
-        assertTrue("Dragging the overlay caption should move the real Android task", moved!!.left != before.left || moved.top != before.top)
+        assertTrue("Dragging the overlay caption should move the real Android task; before=$before moved=$moved", moved!!.left != before.left || moved.top != before.top)
 
         clickOverlay(description = "Minimize native window")
         await(8000) { runBlocking { ShizukuManager.tasks(0) }.firstOrNull { it.id == task.id }?.visible != true }
@@ -160,9 +162,11 @@ class NativeDesktopWorkflowTest {
         clickOverlay(text = "Tasks")
         clickOverlay(text = "Restore")
         await(8000) { runBlocking { ShizukuManager.tasks(0) }.any { it.id == task.id && it.visible } }
+        clickOverlay(description = "Close tasks")
 
         clickOverlay(description = "Close native window")
         await(8000) { runBlocking { ShizukuManager.tasks(0) }.none { it.id == task.id && it.running } }
-        assertTrue("Closing the caption should remove the real Android task", runBlocking { ShizukuManager.tasks(0) }.none { it.id == task.id && it.running })
+        val remaining = runBlocking { ShizukuManager.tasks(0) }
+        assertTrue("Closing the caption should remove the real Android task; remaining=$remaining", remaining.none { it.id == task.id && it.running })
     }
 }

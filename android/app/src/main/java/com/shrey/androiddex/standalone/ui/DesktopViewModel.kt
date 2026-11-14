@@ -60,6 +60,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     private val _maximizedNativeTasks = MutableStateFlow<Set<Int>>(emptySet())
     val maximizedNativeTasks = _maximizedNativeTasks.asStateFlow()
     private val restoreBounds = mutableMapOf<Int, PixelBounds>()
+    private val draggingTasks = mutableSetOf<Int>()
     private data class NativeResizeRequest(val taskId: Int, val bounds: PixelBounds, val commit: Boolean = false)
     private val nativeResizeRequests = Channel<NativeResizeRequest>(Channel.CONFLATED)
     private val _taskError = MutableStateFlow("Connect and authorize Shizuku to list real Android tasks.")
@@ -80,7 +81,10 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
             for (request in nativeResizeRequests) {
                 runCatching { ShizukuManager.resizeTask(request.taskId, request.bounds) }
                     .onFailure { if (request.commit) notify(it.message ?: "Android refused the window resize") }
-                if (request.commit) refreshTasks()
+                if (request.commit) {
+                    endNativeGesture(request.taskId)
+                    refreshTasks()
+                }
                 delay(30)
             }
         }
@@ -235,6 +239,9 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
         return (display?.let { application.createDisplayContext(it) } ?: application).resources.displayMetrics
     }
     fun refreshTasks() {
+        // A caption gesture owns the preview bounds until pointer-up. Polling during the gesture
+        // would snap the overlay back to the shell's previous bounds and corrupt the drag origin.
+        if (draggingTasks.isNotEmpty()) return
         // Polling must not cancel an in-flight shell query every 1.5s; that can starve updates on
         // slower firmware and race a just-applied maximize/restore back to stale task state.
         if (taskJob?.isActive == true) return
@@ -254,7 +261,10 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                     _maximizedNativeTasks.value = _maximizedNativeTasks.value.intersect(ids)
                     val bounds = _nativeBounds.value.filterKeys { it in ids }.toMutableMap()
                     running.filter { (it.freeform || it.id in _maximizedNativeTasks.value) && it.visible && it.id !in _hiddenNativeTasks.value }.take(12).forEach { task ->
-                        ShizukuManager.taskBounds(task.id)?.let { bounds[task.id] = it }
+                        // While the user is dragging a caption, keep the live preview bounds instead of
+                        // snapping back to the shell's not-yet-resized bounds on every poll.
+                        if (task.id in draggingTasks) _nativeBounds.value[task.id]?.let { bounds[task.id] = it }
+                        else ShizukuManager.taskBounds(task.id)?.let { bounds[task.id] = it }
                     }
                     _nativeBounds.value = bounds
                 }
@@ -341,7 +351,6 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                     ShizukuManager.setTaskWindowingMode(taskId, 1)
                 }
             }.onSuccess {
-                Log.e("DesktopDockService", "Native mode request success task=$taskId maximize=$maximize")
                 _maximizedNativeTasks.value = if (maximize) _maximizedNativeTasks.value + taskId else _maximizedNativeTasks.value - taskId
                 // Update the caption immediately; the next shell poll confirms the real mode/bounds.
                 _tasks.value = _tasks.value.map { if (it.id == taskId) it.copy(windowingMode = if (maximize) 1 else 5) else it }
@@ -356,7 +365,6 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
         viewModelScope.launch {
             runCatching { ShizukuManager.removeTask(NativeTask(taskId, displayId, "", "", true, false, false, false, 5)) }
                 .onSuccess {
-                    Log.e("DesktopDockService", "Native close request success task=$taskId")
                     _hiddenNativeTasks.value = _hiddenNativeTasks.value - taskId; _minimizedNativeTasks.value = _minimizedNativeTasks.value - taskId; _maximizedNativeTasks.value = _maximizedNativeTasks.value - taskId; restoreBounds.remove(taskId); refreshTasks(); notify("Android window closed.")
                 }
                 .onFailure { Log.e("DesktopDockService", "Native close request failed task=$taskId", it); notify(it.message ?: "Could not close this Android window") }
@@ -365,13 +373,17 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     fun previewNativeBounds(taskId: Int, bounds: PixelBounds) {
         _nativeBounds.value = _nativeBounds.value + (taskId to bounds)
     }
+    fun beginNativeGesture(taskId: Int) {
+        if (draggingTasks.add(taskId)) taskJob?.cancel()
+    }
+    fun endNativeGesture(taskId: Int) {
+        draggingTasks.remove(taskId)
+    }
     fun dragNativeTask(taskId: Int, bounds: PixelBounds) {
-        Log.e("DesktopDockService", "Native drag task=$taskId bounds=$bounds")
         previewNativeBounds(taskId, bounds)
         nativeResizeRequests.trySend(NativeResizeRequest(taskId, bounds))
     }
     fun commitNativeBounds(taskId: Int, bounds: PixelBounds) {
-        Log.e("DesktopDockService", "Native bounds commit task=$taskId bounds=$bounds")
         previewNativeBounds(taskId, bounds)
         nativeResizeRequests.trySend(NativeResizeRequest(taskId, bounds, commit = true))
     }
@@ -394,6 +406,7 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
     fun appLabel(packageName: String): String = _apps.value.firstOrNull { it.packageName == packageName }?.label ?: packageName
     override fun onCleared() {
         application.getSharedPreferences("dex_preferences", Context.MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(preferenceListener)
+        draggingTasks.clear()
         nativeResizeRequests.close()
         persist()
         super.onCleared()

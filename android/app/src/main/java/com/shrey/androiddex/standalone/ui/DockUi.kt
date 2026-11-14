@@ -1,12 +1,11 @@
 package com.shrey.androiddex.standalone.ui
 
 import android.accessibilityservice.AccessibilityService
-import android.util.Log
+import android.view.MotionEvent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,8 +18,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -194,7 +194,15 @@ private fun NativeTasksPanel(vm: DesktopViewModel, onDismiss: () -> Unit) {
     }
 }
 
+private class CaptionGestureState {
+    var origin: PixelBounds? = null
+    var current: PixelBounds? = null
+    var startX = 0f
+    var startY = 0f
+}
+
 /** Dark title bar drawn over a real Android freeform task; dragging calls the shell resize API. */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun NativeCaptionContent(vm: DesktopViewModel, taskId: Int, screenWidth: Int, screenHeight: Int, onGestureActive: (Boolean) -> Unit = {}) {
     // Overlay windows are owned by a Service lifecycle; collect directly so caption controls keep
@@ -207,35 +215,67 @@ fun NativeCaptionContent(vm: DesktopViewModel, taskId: Int, screenWidth: Int, sc
     val bounds = boundsFlow[taskId]
     val density = LocalDensity.current.density
     val latestBounds by rememberUpdatedState(bounds)
+    val moveGesture = remember(taskId) { CaptionGestureState() }
+    val resizeGesture = remember(taskId) { CaptionGestureState() }
     if (task == null || bounds == null || taskId in hidden) return
+
+    // This caption is a separate WindowManager window that moves/resizes under the pointer. Use raw
+    // screen coordinates and a fixed origin so moving the overlay cannot cancel out the drag delta.
+    fun nextBounds(state: CaptionGestureState, event: MotionEvent, resize: Boolean): PixelBounds? {
+        val origin = state.origin ?: return null
+        val dx = (event.rawX - state.startX).toInt()
+        val dy = (event.rawY - state.startY).toInt()
+        return if (resize) origin.resized(dx, dy, screenWidth, screenHeight, (280 * density).toInt(), (210 * density).toInt())
+        else origin.moved(dx, dy, screenWidth, screenHeight)
+    }
+    fun beginGesture(state: CaptionGestureState, event: MotionEvent): Boolean {
+        val origin = latestBounds ?: return false
+        state.origin = origin
+        state.current = origin
+        state.startX = event.rawX
+        state.startY = event.rawY
+        vm.beginNativeGesture(taskId)
+        onGestureActive(true)
+        return true
+    }
+    fun updateGesture(state: CaptionGestureState, event: MotionEvent, resize: Boolean): Boolean {
+        val next = nextBounds(state, event, resize) ?: return false
+        state.current = next
+        vm.dragNativeTask(taskId, next)
+        return true
+    }
+    fun finishGesture(state: CaptionGestureState, event: MotionEvent, resize: Boolean): Boolean {
+        val committed = nextBounds(state, event, resize) ?: state.current ?: state.origin
+        state.origin = null
+        state.current = null
+        if (committed != null) vm.commitNativeBounds(taskId, committed) else vm.endNativeGesture(taskId)
+        onGestureActive(false)
+        return true
+    }
+
     Surface(Modifier.fillMaxSize(), color = if (task.focused) Color(0xFF0B0C0E) else Color(0xFF171A1D),
         shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF34373F))) {
         Row(Modifier.fillMaxSize().padding(start = 8.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f).fillMaxHeight().pointerInput(taskId, screenWidth, screenHeight) {
-                detectDragGestures(
-                    onDragStart = { onGestureActive(true) },
-                    onDragEnd = { latestBounds?.let { vm.commitNativeBounds(taskId, it) }; onGestureActive(false) },
-                    onDragCancel = { latestBounds?.let { vm.commitNativeBounds(taskId, it) }; onGestureActive(false) },
-                ) { change, amount ->
-                    val current = latestBounds ?: return@detectDragGestures
-                    vm.dragNativeTask(taskId, current.moved(amount.x.toInt(), amount.y.toInt(), screenWidth, screenHeight))
-                    change.consume()
+            Row(Modifier.weight(1f).fillMaxHeight().pointerInteropFilter { event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> beginGesture(moveGesture, event)
+                    MotionEvent.ACTION_MOVE -> updateGesture(moveGesture, event, resize = false)
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> finishGesture(moveGesture, event, resize = false)
+                    else -> false
                 }
             }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 AppIcon(vm.appsRepository, task.packageName, 18.dp)
                 Text(vm.appLabel(task.packageName), fontSize = 11.sp, fontWeight = if (task.focused) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = { vm.minimizeNativeTask(taskId) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Minimize, "Minimize native window", Modifier.size(16.dp)) }
-            IconButton(onClick = {
-                Log.e("DesktopDockService", "Caption maximize/restore clicked task=$taskId maximized=${taskId in maximized}")
-                vm.toggleNativeMaximize(taskId)
-            }, modifier = Modifier.size(32.dp)) { Icon(if (taskId in maximized) Icons.Default.FilterNone else Icons.Default.CropSquare, if (taskId in maximized) "Restore native window" else "Maximize native window", Modifier.size(15.dp)) }
+            IconButton(onClick = { vm.toggleNativeMaximize(taskId) }, modifier = Modifier.size(32.dp)) { Icon(if (taskId in maximized) Icons.Default.FilterNone else Icons.Default.CropSquare, if (taskId in maximized) "Restore native window" else "Maximize native window", Modifier.size(15.dp)) }
             IconButton(onClick = { vm.closeNativeTask(taskId) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Close, "Close native window", Modifier.size(16.dp)) }
-            Box(Modifier.size(22.dp, 30.dp).semantics { contentDescription = "Resize native window" }.pointerInput(taskId, screenWidth, screenHeight) {
-                detectDragGestures(onDragEnd = { latestBounds?.let { vm.commitNativeBounds(taskId, it) } }) { change, amount ->
-                    val current = latestBounds ?: return@detectDragGestures
-                    vm.dragNativeTask(taskId, current.resized(amount.x.toInt(), amount.y.toInt(), screenWidth, screenHeight, (280 * density).toInt(), (210 * density).toInt()))
-                    change.consume()
+            Box(Modifier.size(22.dp, 30.dp).semantics { contentDescription = "Resize native window" }.pointerInteropFilter { event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> beginGesture(resizeGesture, event)
+                    MotionEvent.ACTION_MOVE -> updateGesture(resizeGesture, event, resize = true)
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> finishGesture(resizeGesture, event, resize = true)
+                    else -> false
                 }
             }, contentAlignment = Alignment.Center) { Icon(Icons.Default.DragHandle, null, Modifier.size(15.dp), tint = DexMuted) }
         }
