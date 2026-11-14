@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -337,7 +338,10 @@ class DesktopViewModel(private val application: Application, val displayId: Int)
                 // Update the caption immediately; the next shell poll confirms the real mode/bounds.
                 _tasks.value = _tasks.value.map { if (it.id == taskId) it.copy(windowingMode = if (maximize) 1 else 5) else it }
                 refreshTasks()
-            }.onFailure { notify(it.message ?: "Android refused the window mode change") }
+            }.onFailure {
+                Log.e("DesktopDockService", "Native maximize/restore request failed for task $taskId", it)
+                notify(it.message ?: "Android refused the window mode change")
+            }
         }
     }
     fun closeNativeTask(taskId: Int) {
